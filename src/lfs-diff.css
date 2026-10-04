@@ -1,0 +1,65 @@
+.lfs-diff {
+  padding: 16px;
+  color: var(--text);
+}
+.lfs-diff h3,
+.lfs-diff h4,
+.lfs-diff p {
+  margin: 0;
+}
+.lfs-diff h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.lfs-conflict-state {
+  margin-left: 10px;
+  color: var(--modified);
+  font-size: 12px;
+  font-weight: 500;
+}
+.unconfirmed-diff {
+  padding: 12px 16px;
+}
+.lfs-diff header p,
+.lfs-note {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.lfs-sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+.lfs-side {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.lfs-side h4 {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.lfs-side dl {
+  margin: 14px 0 0;
+}
+.lfs-side dt {
+  margin-top: 12px;
+  color: var(--muted);
+}
+.lfs-side dd {
+  margin: 5px 0 0;
+}
+.lfs-side code {
+  font: 11px/1.6 var(--mono);
+  overflow-wrap: anywhere;
+}
+.lfs-side > p {
+  margin-top: 14px;
+  color: var(--muted);
+}

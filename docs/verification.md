@@ -11,7 +11,7 @@
 
 [桌面测试与安装包](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) 在 Mac ARM、Mac Intel、Windows x64 上进行源码检查、安装包构建与安装后 CLI 检查。
 
-每次运行的结果以 Actions 中该提交的实际记录为准。安装检查会读取中文及空格路径、识别子目录、核对 Skill 和启动器，并比较测试仓库查看前后的文件、暂存区与引用字节。
+每次运行的结果以 Actions 中该提交的实际记录为准。安装检查会读取中文及空格路径、识别子目录、核对 Skill 和启动器，验证 LFS 指针与已展开内容的状态，并比较测试仓库查看前后的文件、暂存区、引用、配置及 LFS 对象字节。
 
 ## 仍需人工确认
 

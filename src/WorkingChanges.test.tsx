@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { ChangesSidebar } from "./WorkingChanges";
-import type { FileState } from "./types";
+import { ChangesSidebar, SourceEditor } from "./WorkingChanges";
+import type { Diff, FileState } from "./types";
 import type { WorkingFile } from "./useWorkingCopy";
 
 const makeFile = (
@@ -38,6 +38,36 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+it("LFS 对象展示不提供无效的代码布局切换，普通差异保留切换入口", () => {
+  const files = [makeFile("素材.bin")];
+  const diff: Diff = {
+    patch: "",
+    truncated: false,
+    binary: false,
+    note: null,
+    conflict: null,
+  };
+  const props = {
+    files,
+    file: { path: "素材.bin", mode: "unstaged" } as WorkingFile,
+    error: null,
+    retry: () => {},
+  };
+  const view = render(
+    <SourceEditor
+      {...props}
+      diff={{
+        ...diff,
+        lfs: { before: null, after: { oid: "a".repeat(64), size: 42 } },
+      }}
+    />,
+  );
+  expect(screen.getByRole("region", { name: "Git LFS 对象变化" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "统一差异" })).toBeNull();
+  view.rerender(<SourceEditor {...props} diff={diff} />);
+  expect(screen.getByRole("button", { name: "统一差异" })).toBeTruthy();
 });
 
 describe("更改目录树", () => {

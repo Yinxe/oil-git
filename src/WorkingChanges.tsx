@@ -323,7 +323,7 @@ export function SourceEditor({
               <strong title={file.path}>{file.path.split("/").pop()}</strong>
               <span>{captions[file.mode]}</span>
             </div>
-            {!selected?.conflict && (
+            {!selected?.conflict && !diff?.lfs && (
               <div className="diff-tabs" aria-label="差异展示方式">
                 <button
                   aria-pressed={wide && preferSplit}

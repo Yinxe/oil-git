@@ -40,6 +40,7 @@ impl From<std::io::Error> for Error {
 #[derive(Clone)]
 pub struct Git {
     pub binary: PathBuf,
+    lfs_helper: Option<PathBuf>,
 }
 pub struct Output {
     pub bytes: Vec<u8>,
@@ -76,6 +77,60 @@ fn should_remove_git_environment(key: &OsStr) -> bool {
         return false;
     }
     true
+}
+
+fn standard_git_lfs_command(command: &str, expected_arguments: &str) -> bool {
+    let command = command.trim_start();
+    let (executable, remainder) = if let Some(quoted) = command.strip_prefix('\'') {
+        let Some(end) = quoted.find('\'') else {
+            return false;
+        };
+        (&quoted[..end], &quoted[end + 1..])
+    } else if let Some(quoted) = command.strip_prefix('"') {
+        let mut executable = String::new();
+        let mut escaped = false;
+        let mut end = None;
+        for (index, character) in quoted.char_indices() {
+            if escaped {
+                executable.push(character);
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                end = Some(index + character.len_utf8());
+                break;
+            } else {
+                executable.push(character);
+            }
+        }
+        let Some(end) = end else {
+            return false;
+        };
+        let remainder = &quoted[end..];
+        let basename = executable.rsplit(['/', '\\']).next().unwrap_or_default();
+        return matches!(
+            basename.to_ascii_lowercase().as_str(),
+            "git-lfs" | "git-lfs.exe"
+        ) && remainder.trim() == expected_arguments;
+    } else {
+        let end = command.find(char::is_whitespace).unwrap_or(command.len());
+        (&command[..end], &command[end..])
+    };
+    let basename = executable.rsplit(['/', '\\']).next().unwrap_or_default();
+    matches!(
+        basename.to_ascii_lowercase().as_str(),
+        "git-lfs" | "git-lfs.exe"
+    ) && remainder.trim() == expected_arguments
+}
+
+fn config_records(bytes: &[u8]) -> Vec<(&[u8], &[u8])> {
+    bytes
+        .split(|byte| *byte == 0)
+        .filter_map(|record| {
+            let separator = record.iter().position(|byte| *byte == b'\n')?;
+            Some((&record[..separator], &record[separator + 1..]))
+        })
+        .collect()
 }
 
 #[cfg(unix)]
@@ -208,6 +263,73 @@ fn terminate_process_tree(child: &mut Child, job: &JobHandle) {
 }
 
 impl Git {
+    pub fn new(binary: PathBuf) -> Self {
+        Self {
+            binary,
+            lfs_helper: None,
+        }
+    }
+
+    /// Tests may point the Git filter driver at a trusted helper executable.
+    /// Production instances always use the current application executable.
+    pub fn with_lfs_helper(binary: PathBuf, helper: PathBuf) -> Self {
+        Self {
+            binary,
+            lfs_helper: Some(helper),
+        }
+    }
+
+    fn helper_command(&self, subcommand: &str) -> Result<String> {
+        let executable = match &self.lfs_helper {
+            Some(path) => path.clone(),
+            None => std::env::current_exe().map_err(|error| {
+                Error::new("lfsHelper", format!("无法定位 LFS helper：{error}"))
+            })?,
+        };
+        let path = executable
+            .to_str()
+            .ok_or_else(|| Error::new("lfsHelper", "LFS helper 路径无法安全编码。"))?
+            .to_owned();
+        #[cfg(windows)]
+        let path = {
+            // Git invokes filter commands through its shell. Forward slashes
+            // keep drive paths intact inside that shell, including spaces.
+            path.replace('\\', "/")
+        };
+        let quoted = format!("'{}'", path.replace('\'', "'\\''"));
+        Ok(format!("{quoted} {subcommand}"))
+    }
+
+    fn reject_partial_clone(&self, repo: &Path) -> Result<()> {
+        // GIT_NO_LAZY_FETCH is set on every child process. Refuse partial
+        // clones as well so older Git versions that ignore that variable can
+        // never turn a read into a network fetch or an object-store write.
+        let config = self.run(repo, &["config", "--null", "--list"], READ_LIMIT, true)?;
+        if config.truncated {
+            return Err(Error::new(
+                "tooLarge",
+                "Git 配置过大，无法确认是否为部分克隆仓库。",
+            ));
+        }
+        let is_partial = config_records(&config.bytes)
+            .into_iter()
+            .any(|(key, value)| {
+                let key = String::from_utf8_lossy(key).to_ascii_lowercase();
+                let value = String::from_utf8_lossy(value).trim().to_ascii_lowercase();
+                key == "extensions.partialclone"
+                    || (key.starts_with("remote.")
+                        && key.ends_with(".promisor")
+                        && !matches!(value.as_str(), "false" | "no" | "off" | "0"))
+            });
+        if is_partial {
+            return Err(Error::new(
+                "partialCloneUnsupported",
+                "只读模式暂不支持部分克隆仓库，避免按需下载 Git 对象。",
+            ));
+        }
+        Ok(())
+    }
+
     pub fn run(
         &self,
         repo: &Path,
@@ -226,6 +348,8 @@ impl Git {
         allow_failure: bool,
         input: Option<&[u8]>,
     ) -> Result<Output> {
+        let process_command = self.helper_command(crate::lfs::FILTER_PROCESS_COMMAND)?;
+        let clean_command = self.helper_command(crate::lfs::CLEAN_COMMAND)?;
         let mut command = Command::new(&self.binary);
         for (key, _) in std::env::vars_os().filter(|(key, _)| should_remove_git_environment(key)) {
             command.env_remove(key);
@@ -237,14 +361,23 @@ impl Git {
                 "core.fsmonitor=false",
                 "-c",
                 "log.showSignature=false",
-                "-C",
+                "-c",
+                "diff.autoRefreshIndex=false",
+                "-c",
+                "filter.lfs.required=true",
+                "-c",
             ])
+            .arg(format!("filter.lfs.process={process_command}"))
+            .arg("-c")
+            .arg(format!("filter.lfs.clean={clean_command}"))
+            .args(["-C"])
             .arg(repo)
             .args(args)
             // A Git invocation always belongs to the selected repository. Do
             // not inherit routing, alternate-index/object, namespace, or
             // one-off config overrides from a host app or shell.
             .env("GIT_OPTIONAL_LOCKS", "0")
+            .env("GIT_NO_LAZY_FETCH", "1")
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("LC_ALL", "C")
             .stdout(Stdio::piped())
@@ -404,7 +537,7 @@ impl Git {
             }
         }
         for binary in candidates {
-            let git = Self { binary };
+            let git = Self::new(binary);
             if let Ok(version) = git.text(&std::env::temp_dir(), &["--version"], false) {
                 return Ok((git, version));
             }
@@ -423,7 +556,9 @@ impl Git {
                 "第一版暂不支持裸仓库，请选择带工作目录的 Git 项目。",
             ));
         }
-        self.repository_root(&path)
+        let root = self.repository_root(&path)?;
+        self.reject_partial_clone(&root)?;
+        Ok(root)
     }
     fn repository_root(&self, path: &Path) -> Result<PathBuf> {
         let root = self.run(path, &["rev-parse", "--show-toplevel"], READ_LIMIT, true)?;
@@ -582,7 +717,7 @@ impl Git {
         }
         Ok(())
     }
-    fn tracked_index_entries(&self, repo: &Path) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    fn tracked_index_entries(&self, repo: &Path) -> Result<Vec<IndexEntry>> {
         let index = self.run(repo, &["ls-files", "--stage", "-z"], READ_LIMIT, false)?;
         if index.truncated {
             return Err(Error::new("tooLarge", "暂存区过大，无法完整读取。"));
@@ -593,11 +728,12 @@ impl Git {
             .filter_map(|record| {
                 let separator = record.iter().position(|byte| *byte == b'\t')?;
                 let header = &record[..separator];
-                let mode_end = header.iter().position(|byte| *byte == b' ')?;
-                Some((
-                    header[..mode_end].to_vec(),
-                    record[separator + 1..].to_vec(),
-                ))
+                let mut fields = header.split(|byte| *byte == b' ');
+                Some(IndexEntry {
+                    mode: fields.next()?.to_vec(),
+                    oid: fields.next()?.to_vec(),
+                    path: record[separator + 1..].to_vec(),
+                })
             })
             .collect())
     }
@@ -621,14 +757,14 @@ impl Git {
         if !visited.insert(canonical_repo.clone()) {
             return Ok(());
         }
+        self.reject_partial_clone(&canonical_repo)?;
         let entries = self.tracked_index_entries(&canonical_repo)?;
         let mut paths = Vec::new();
         let mut gitlinks = Vec::new();
-        for (mode, path) in entries {
-            if mode == b"160000" {
-                gitlinks.push(path);
-            } else {
-                paths.push(path);
+        for entry in &entries {
+            paths.push(entry.path.clone());
+            if entry.mode == b"160000" {
+                gitlinks.push(entry.path.clone());
             }
         }
         if !paths.is_empty() {
@@ -652,7 +788,8 @@ impl Git {
             }
             let fields: Vec<_> = attributes.bytes.split(|byte| *byte == 0).collect();
             let mut drivers = HashSet::<String>::new();
-            for record in fields.chunks_exact(3) {
+            let mut lfs_paths = HashSet::<Vec<u8>>::new();
+            for record in fields.as_chunks::<3>().0 {
                 if record[1] != b"filter" || matches!(record[2], b"unspecified" | b"unset") {
                     continue;
                 }
@@ -663,9 +800,19 @@ impl Git {
                     )
                 })?;
                 drivers.insert(name.to_owned());
+                if name == "lfs" {
+                    lfs_paths.insert(record[0].to_vec());
+                }
+            }
+            if drivers.contains("lfs") {
+                self.validate_standard_lfs_driver(&canonical_repo)?;
+                self.reject_lfs_index_extensions(&canonical_repo, &entries, &lfs_paths)?;
             }
             let mut active = HashSet::<String>::new();
             for name in drivers {
+                if name == "lfs" {
+                    continue;
+                }
                 for operation in ["clean", "process"] {
                     let key = format!("filter.{name}.{operation}");
                     let configured = self.run(
@@ -736,7 +883,484 @@ impl Git {
         }
         Ok(())
     }
+    fn reject_lfs_index_extensions(
+        &self,
+        repo: &Path,
+        entries: &[IndexEntry],
+        lfs_paths: &HashSet<Vec<u8>>,
+    ) -> Result<()> {
+        let mut seen = HashSet::<Vec<u8>>::new();
+        let mut object_ids = Vec::new();
+        for entry in entries {
+            if entry.mode.starts_with(b"100")
+                && lfs_paths.contains(&entry.path)
+                && seen.insert(entry.oid.clone())
+            {
+                object_ids.push(entry.oid.clone());
+            }
+        }
+        const BATCH_SIZE: usize = 512;
+        for objects in object_ids.chunks(BATCH_SIZE) {
+            let mut input = Vec::with_capacity(objects.len() * 42);
+            for oid in objects {
+                input.extend_from_slice(oid);
+                input.push(b'\n');
+            }
+            let checked = self.run_with_input(
+                repo,
+                &[
+                    "cat-file",
+                    "--batch-check=%(objectname) %(objecttype) %(objectsize)",
+                ],
+                READ_LIMIT,
+                false,
+                Some(&input),
+            )?;
+            if checked.truncated {
+                return Err(Error::new(
+                    "tooLarge",
+                    "暂存区 LFS 对象信息过大，无法确认指针安全。",
+                ));
+            }
+            let mut small = Vec::new();
+            for (oid, line) in objects
+                .iter()
+                .zip(checked.bytes.split(|byte| *byte == b'\n'))
+            {
+                if line.is_empty() {
+                    continue;
+                }
+                let fields: Vec<_> = line.split(|byte| byte.is_ascii_whitespace()).collect();
+                if fields.get(1) != Some(&b"blob".as_slice()) {
+                    continue;
+                }
+                let Some(size) = fields
+                    .get(2)
+                    .and_then(|value| std::str::from_utf8(value).ok())
+                    .and_then(|value| value.parse::<usize>().ok())
+                else {
+                    continue;
+                };
+                if size < 1024 {
+                    small.push((oid.clone(), size));
+                }
+            }
+            for batch in small.chunks(BATCH_SIZE) {
+                let mut input = Vec::with_capacity(batch.len() * 42);
+                for (oid, _) in batch {
+                    input.extend_from_slice(oid);
+                    input.push(b'\n');
+                }
+                let output = self.run_with_input(
+                    repo,
+                    &["cat-file", "--batch"],
+                    1024 * 1024,
+                    false,
+                    Some(&input),
+                )?;
+                if output.truncated {
+                    return Err(Error::new("tooLarge", "暂存区 LFS 指针读取结果过大。"));
+                }
+                let mut offset = 0_usize;
+                for (expected_oid, expected_size) in batch {
+                    let header_end = output.bytes[offset..]
+                        .iter()
+                        .position(|byte| *byte == b'\n')
+                        .map(|length| offset + length)
+                        .ok_or_else(|| Error::new("read", "Git LFS 指针对象头不完整。"))?;
+                    let fields: Vec<_> = output.bytes[offset..header_end]
+                        .split(|byte| byte.is_ascii_whitespace())
+                        .collect();
+                    if fields.first().copied() != Some(expected_oid.as_slice())
+                        || fields.get(1) != Some(&b"blob".as_slice())
+                        || fields.get(2).and_then(|value| {
+                            std::str::from_utf8(value).ok()?.parse::<usize>().ok()
+                        }) != Some(*expected_size)
+                    {
+                        return Err(Error::new("read", "Git LFS 指针对象头无效。"));
+                    }
+                    offset = header_end + 1;
+                    let end = offset
+                        .checked_add(*expected_size)
+                        .ok_or_else(|| Error::new("read", "Git LFS 指针对象长度无效。"))?;
+                    let bytes = output
+                        .bytes
+                        .get(offset..end)
+                        .ok_or_else(|| Error::new("read", "Git LFS 指针对象不完整。"))?;
+                    if crate::lfs::has_unsupported_extension(bytes) {
+                        return Err(Error::new(
+                            "unsupportedLfsExtension",
+                            "暂不支持含 Git LFS 扩展字段的指针文件。",
+                        ));
+                    }
+                    offset = end;
+                    if output.bytes.get(offset) != Some(&b'\n') {
+                        return Err(Error::new("read", "Git LFS 指针对象边界无效。"));
+                    }
+                    offset += 1;
+                }
+            }
+        }
+        Ok(())
+    }
+    fn external_config_values(&self, repo: &Path, key: &str) -> Result<Vec<String>> {
+        let output = self.run(
+            repo,
+            &["config", "--null", "--show-origin", "--get-all", key],
+            32_000,
+            true,
+        )?;
+        if output.truncated {
+            return Err(Error::new(
+                "tooLarge",
+                "Git LFS 过滤器配置过大，无法确认只读安全。",
+            ));
+        }
+        let fields: Vec<_> = output.bytes.split(|byte| *byte == 0).collect();
+        Ok(fields
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .filter(|pair| pair[0] != b"command line:")
+            .map(|pair| String::from_utf8_lossy(pair[1]).into_owned())
+            .collect())
+    }
+    fn validate_standard_lfs_driver(&self, repo: &Path) -> Result<()> {
+        for (operation, arguments) in [
+            ("process", "filter-process"),
+            ("clean", "clean -- %f"),
+            ("smudge", "smudge -- %f"),
+        ] {
+            let key = format!("filter.lfs.{operation}");
+            let values = self.external_config_values(repo, &key)?;
+            let Some(command) = values.last().map(String::as_str) else {
+                continue;
+            };
+            if command.trim().is_empty() || standard_git_lfs_command(command, arguments) {
+                continue;
+            }
+            return Err(Error::new(
+                "unsafeFilter",
+                format!(
+                    "此仓库的 filter.lfs.{operation} 不是标准 Git LFS 命令，无法确认只读语义。"
+                ),
+            ));
+        }
+        let extensions = self.run(repo, &["config", "--null", "--list"], READ_LIMIT, true)?;
+        if extensions.truncated {
+            return Err(Error::new(
+                "tooLarge",
+                "Git LFS 扩展配置过大，无法确认只读安全。",
+            ));
+        }
+        if config_records(&extensions.bytes).iter().any(|(key, _)| {
+            String::from_utf8_lossy(key)
+                .to_ascii_lowercase()
+                .starts_with("lfs.extension.")
+        }) {
+            return Err(Error::new(
+                "unsupportedLfsExtension",
+                "此仓库配置了 Git LFS 扩展转换，当前只支持标准 LFS 指针。",
+            ));
+        }
+        Ok(())
+    }
+    fn path_uses_lfs(
+        &self,
+        repo: &Path,
+        path: &str,
+        source: Option<&str>,
+        cached: bool,
+    ) -> Result<bool> {
+        validate_relative(path)?;
+        let mut args = vec!["check-attr"];
+        if let Some(source) = source {
+            args.extend(["--source", source]);
+        } else if cached {
+            args.push("--cached");
+        }
+        args.extend(["-z", "--stdin", "filter"]);
+        let input = [path.as_bytes(), b"\0"].concat();
+        let output = self.run_with_input(repo, &args, 4096, source.is_some(), Some(&input))?;
+        if !output.ok {
+            if source.is_some()
+                && (output.stderr.contains("unknown option")
+                    || output.stderr.contains("unknown argument"))
+            {
+                return Err(Error::new(
+                    "lfsAttributeSourceUnsupported",
+                    "此版本 Git 无法读取提交当时的 .gitattributes，未确认该历史差异的 LFS 状态。",
+                ));
+            }
+            return Err(Error::new("git", output.stderr));
+        }
+        if output.truncated {
+            return Err(Error::new(
+                "tooLarge",
+                "Git 属性检查结果过大，无法确认 LFS 状态。",
+            ));
+        }
+        let fields: Vec<_> = output.bytes.split(|byte| *byte == 0).collect();
+        let is_lfs = fields
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .any(|record| record[1] == b"filter" && record[2] == b"lfs");
+        if is_lfs {
+            self.validate_standard_lfs_driver(repo)?;
+        }
+        Ok(is_lfs)
+    }
+    fn index_blob(&self, repo: &Path, path: &str) -> Result<Option<GitBlob>> {
+        self.index_stage_blob(repo, path, "0")
+    }
+    fn index_stage_blob(&self, repo: &Path, path: &str, stage: &str) -> Result<Option<GitBlob>> {
+        let literal = format!(":(literal){path}");
+        let output = self.run(
+            repo,
+            &["ls-files", "--stage", "-z", "--", &literal],
+            4096,
+            false,
+        )?;
+        if output.truncated {
+            return Err(Error::new("tooLarge", "选中文件的暂存信息过大。"));
+        }
+        Ok(output
+            .bytes
+            .split(|byte| *byte == 0)
+            .filter_map(parse_index_blob_record)
+            .find(|entry| entry.stage == stage))
+    }
+    fn tree_blob(&self, repo: &Path, revision: &str, path: &str) -> Result<Option<GitBlob>> {
+        let literal = format!(":(literal){path}");
+        let output = self.run(
+            repo,
+            &["ls-tree", "-r", "-z", revision, "--", &literal],
+            4096,
+            false,
+        )?;
+        if output.truncated {
+            return Err(Error::new("tooLarge", "选中文件的历史信息过大。"));
+        }
+        Ok(output
+            .bytes
+            .split(|byte| *byte == 0)
+            .filter_map(parse_tree_blob_record)
+            .next())
+    }
+    fn small_blob(&self, repo: &Path, oid: &str) -> Result<Option<Vec<u8>>> {
+        let input = [oid.as_bytes(), b"\n"].concat();
+        let checked = self.run_with_input(
+            repo,
+            &[
+                "cat-file",
+                "--batch-check=%(objectname) %(objecttype) %(objectsize)",
+            ],
+            256,
+            false,
+            Some(&input),
+        )?;
+        let fields: Vec<_> = checked
+            .bytes
+            .split(|byte| byte.is_ascii_whitespace())
+            .filter(|field| !field.is_empty())
+            .collect();
+        if fields.get(1).copied() != Some(b"blob".as_slice()) {
+            return Ok(None);
+        }
+        let Some(size) = fields
+            .get(2)
+            .and_then(|value| std::str::from_utf8(value).ok())
+            .and_then(|value| value.parse::<usize>().ok())
+        else {
+            return Ok(None);
+        };
+        if size >= 1024 {
+            return Ok(None);
+        }
+        let output =
+            self.run_with_input(repo, &["cat-file", "--batch"], 2048, false, Some(&input))?;
+        let header_end = output
+            .bytes
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .ok_or_else(|| Error::new("read", "Git LFS 指针对象头不完整。"))?;
+        let header: Vec<_> = output.bytes[..header_end]
+            .split(|byte| byte.is_ascii_whitespace())
+            .filter(|field| !field.is_empty())
+            .collect();
+        let returned_oid = std::str::from_utf8(header.first().copied().unwrap_or_default())
+            .map_err(|_| Error::new("read", "Git LFS 指针对象 ID 无效。"))?;
+        if returned_oid != oid
+            || header.get(1).copied() != Some(b"blob".as_slice())
+            || header
+                .get(2)
+                .and_then(|value| std::str::from_utf8(value).ok()?.parse::<usize>().ok())
+                != Some(size)
+        {
+            return Err(Error::new("read", "Git LFS 指针对象头无效。"));
+        }
+        let start = header_end + 1;
+        let end = start
+            .checked_add(size)
+            .ok_or_else(|| Error::new("read", "Git LFS 指针对象长度无效。"))?;
+        let body = output
+            .bytes
+            .get(start..end)
+            .ok_or_else(|| Error::new("read", "Git LFS 指针对象不完整。"))?;
+        if output.bytes.get(end) != Some(&b'\n') {
+            return Err(Error::new("read", "Git LFS 指针对象边界无效。"));
+        }
+        Ok(Some(body.to_vec()))
+    }
+    fn lfs_side_from_blob(
+        &self,
+        repo: &Path,
+        blob: Option<GitBlob>,
+        filter_lfs: bool,
+    ) -> Result<LfsSide> {
+        let Some(blob) = blob else {
+            return Ok(LfsSide::missing());
+        };
+        if !filter_lfs {
+            return Ok(LfsSide::regular());
+        }
+        if !blob.mode.starts_with("100") {
+            return Ok(LfsSide::unsupported());
+        }
+        let Some(bytes) = self.small_blob(repo, &blob.oid)? else {
+            return Ok(LfsSide::regular());
+        };
+        if crate::lfs::has_unsupported_extension(&bytes) {
+            return Err(Error::new(
+                "unsupportedLfsExtension",
+                "暂不支持含 Git LFS 扩展字段的指针文件。",
+            ));
+        }
+        Ok(crate::lfs::parse_pointer(&bytes)
+            .map(LfsPointer::from)
+            .map_or_else(LfsSide::regular, LfsSide::pointer))
+    }
+    fn lfs_side_from_worktree(&self, repo: &Path, path: &str, filter_lfs: bool) -> Result<LfsSide> {
+        let target = match safe_file(repo, path) {
+            Ok(target) => target,
+            Err(error) if error.kind == "symlink" => return Ok(LfsSide::unsupported()),
+            Err(error) if error.kind == "missing" => return Ok(LfsSide::missing()),
+            Err(error) => return Err(error),
+        };
+        let metadata = match fs::symlink_metadata(&target) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(LfsSide::missing());
+            }
+            Err(error) => return Err(error.into()),
+        };
+        if !metadata.is_file() {
+            return Ok(LfsSide::unsupported());
+        }
+        if !filter_lfs {
+            return Ok(LfsSide::regular());
+        }
+        let file = fs::File::open(target)?;
+        let mut clean = Vec::with_capacity(1024);
+        let pointer = crate::lfs::clean(&mut &file, &mut clean).map_err(|error| match error {
+            crate::lfs::CleanError::UnsupportedExtension => Error::new(
+                "unsupportedLfsExtension",
+                "暂不支持含 Git LFS 扩展字段的指针文件。",
+            ),
+            crate::lfs::CleanError::Io(error) => error.into(),
+        })?;
+        Ok(pointer
+            .map(LfsPointer::from)
+            .map_or_else(LfsSide::regular, LfsSide::pointer))
+    }
+    fn workspace_lfs_diff(
+        &self,
+        repo: &Path,
+        mode: &str,
+        file: &FileState,
+    ) -> Result<Option<LfsDiff>> {
+        if file.conflict || mode == "conflict" {
+            return Ok(None);
+        }
+        let path = file.path.as_str();
+        let old_path = file.old_path.as_deref().unwrap_or(path);
+        let (before_path, before_cached, after_path, after_cached, before_revision) =
+            if mode == "staged" {
+                (old_path, false, path, true, Some("HEAD"))
+            } else {
+                (path, true, path, false, None)
+            };
+        let has_head = self
+            .run(repo, &["rev-parse", "--verify", "HEAD"], 256, true)?
+            .ok;
+        let before_lfs = if let Some(revision) = before_revision.filter(|_| has_head) {
+            self.path_uses_lfs(repo, before_path, Some(revision), false)?
+        } else {
+            self.path_uses_lfs(repo, before_path, None, before_cached)?
+        };
+        let after_lfs = self.path_uses_lfs(repo, after_path, None, after_cached)?;
+        if !before_lfs && !after_lfs {
+            return Ok(None);
+        }
+        let before_blob = if mode == "staged" && has_head {
+            self.tree_blob(repo, "HEAD", before_path)?
+        } else if mode == "staged" {
+            None
+        } else {
+            self.index_blob(repo, before_path)?
+        };
+        let before = self.lfs_side_from_blob(repo, before_blob, before_lfs)?;
+        let after = if mode == "staged" {
+            self.lfs_side_from_blob(repo, self.index_blob(repo, after_path)?, after_lfs)?
+        } else {
+            self.lfs_side_from_worktree(repo, after_path, after_lfs)?
+        };
+        Ok(Some(LfsDiff::from_sides(before, after)))
+    }
+    fn conflict_lfs_diff(&self, repo: &Path, path: &str) -> Result<Option<LfsDiff>> {
+        let current_attrs = self.path_uses_lfs(repo, path, None, false)?;
+        let index_attrs = self.path_uses_lfs(repo, path, None, true)?;
+        if !current_attrs && !index_attrs {
+            return Ok(None);
+        }
+        let ours = self.index_stage_blob(repo, path, "2")?;
+        let theirs = self.index_stage_blob(repo, path, "3")?;
+        let mut lfs = LfsDiff::from_sides(
+            self.lfs_side_from_blob(repo, ours, true)?,
+            self.lfs_side_from_blob(repo, theirs, true)?,
+        );
+        lfs.conflict = Some(true);
+        Ok(Some(lfs))
+    }
+    fn commit_lfs_diff(
+        &self,
+        repo: &Path,
+        revision: &str,
+        parent: Option<&str>,
+        old_path: Option<&str>,
+        path: &str,
+    ) -> Result<Option<LfsDiff>> {
+        let before_path = old_path.unwrap_or(path);
+        let before_lfs = match parent {
+            Some(parent) => self.path_uses_lfs(repo, before_path, Some(parent), false)?,
+            None => false,
+        };
+        let after_lfs = self.path_uses_lfs(repo, path, Some(revision), false)?;
+        if !before_lfs && !after_lfs {
+            return Ok(None);
+        }
+        let before_blob = match parent {
+            Some(parent) => self.tree_blob(repo, parent, before_path)?,
+            None => None,
+        };
+        let after_blob = self.tree_blob(repo, revision, path)?;
+        let before = self.lfs_side_from_blob(repo, before_blob, before_lfs)?;
+        let after = self.lfs_side_from_blob(repo, after_blob, after_lfs)?;
+        Ok(Some(LfsDiff::from_sides(before, after)))
+    }
     pub fn files(&self, repo: &Path) -> Result<Vec<FileState>> {
+        self.reject_partial_clone(repo)?;
         self.files_with_status_revision(repo)
             .map(|(files, _)| files)
     }
@@ -937,6 +1561,7 @@ impl Git {
         Ok(trees)
     }
     pub fn snapshot(&self, repo: &Path) -> Result<Snapshot> {
+        self.reject_partial_clone(repo)?;
         let normalized = self.repository_root(repo)?;
         if normalized != repo {
             return Err(Error::new(
@@ -1061,6 +1686,7 @@ impl Git {
         offset: usize,
         expected: &str,
     ) -> Result<HistoryPage> {
+        self.reject_partial_clone(repo)?;
         let (head, refs, revision) = self.history_state(repo)?;
         if !expected.is_empty() && expected != revision {
             return Err(Error::new("staleHistory", "提交历史已变化，正在重新加载。"));
@@ -1127,6 +1753,7 @@ impl Git {
         value: &str,
         expected_history_revision: Option<&str>,
     ) -> Result<CommitDetail> {
+        self.reject_partial_clone(repo)?;
         let expected = self.check_expected_history(repo, expected_history_revision)?;
         let detail = self.commit_inner(repo, value)?;
         self.verify_expected_history_still_current(repo, expected.as_deref())?;
@@ -1139,6 +1766,7 @@ impl Git {
         path: Option<&str>,
         expected_history_revision: Option<&str>,
     ) -> Result<CommitView> {
+        self.reject_partial_clone(repo)?;
         let expected = self.check_expected_history(repo, expected_history_revision)?;
         let detail = self.commit_inner(repo, value)?;
         let file_path = match path {
@@ -1153,7 +1781,7 @@ impl Git {
         };
         let diff = file_path
             .as_deref()
-            .map(|path| self.commit_file_diff(repo, &detail, path))
+            .map(|path| self.commit_diff_with_lfs(repo, &detail, path))
             .transpose()?;
         self.verify_expected_history_still_current(repo, expected.as_deref())?;
         Ok(CommitView {
@@ -1263,11 +1891,35 @@ impl Git {
             binary: false,
             note: None,
             conflict: None,
+            lfs: None,
         };
         diff.binary = is_binary_patch(&diff.patch);
         if diff.patch.is_empty() {
             diff.note = Some("当前比较范围没有差异。".into());
         }
+        Ok(diff)
+    }
+    fn commit_diff_with_lfs(&self, repo: &Path, detail: &CommitDetail, path: &str) -> Result<Diff> {
+        let file = detail
+            .files
+            .iter()
+            .find(|file| file.path == path)
+            .ok_or_else(|| Error::new("invalid", "该提交中没有这个变更文件。"))?;
+        let mut diff = self.commit_file_diff(repo, detail, path)?;
+        diff.lfs = match self.commit_lfs_diff(
+            repo,
+            &detail.commit.hash,
+            detail.commit.parents.first().map(String::as_str),
+            file.old_path.as_deref(),
+            path,
+        ) {
+            Ok(lfs) => lfs,
+            Err(error) if error.kind == "lfsAttributeSourceUnsupported" => {
+                diff.note = Some(error.message);
+                None
+            }
+            Err(error) => return Err(error),
+        };
         Ok(diff)
     }
     pub fn diff(&self, repo: &Path, mode: &str, path: &str, commit: Option<&str>) -> Result<Diff> {
@@ -1281,6 +1933,7 @@ impl Git {
         commit: Option<&str>,
         expected_history_revision: Option<&str>,
     ) -> Result<Diff> {
+        self.reject_partial_clone(repo)?;
         let expected = if mode == "commit" {
             self.check_expected_history(repo, expected_history_revision)?
         } else {
@@ -1300,7 +1953,7 @@ impl Git {
         validate_relative(path)?;
         if mode == "commit" {
             let detail = self.commit_inner(repo, commit.unwrap_or(""))?;
-            return self.commit_file_diff(repo, &detail, path);
+            return self.commit_diff_with_lfs(repo, &detail, path);
         }
         let literal = format!(":(literal){path}");
         let options = [
@@ -1316,16 +1969,18 @@ impl Git {
             binary: false,
             note: None,
             conflict: None,
+            lfs: None,
         };
         let mut owned_paths = vec![literal];
         let output = if ["staged", "unstaged", "conflict"].contains(&mode) {
             let files = self.files(repo)?;
-            let Some(file) = files.iter().find(|f| f.path == path) else {
+            let Some(file) = files.iter().find(|f| f.path == path).cloned() else {
                 result.note = Some("该文件已没有待提交修改。".into());
                 return Ok(result);
             };
             if mode == "conflict" && file.conflict {
-                result.conflict = Some(self.conflict(repo, path, file)?);
+                result.conflict = Some(self.conflict(repo, path, &file)?);
+                result.lfs = self.conflict_lfs_diff(repo, path)?;
             }
             if file.untracked {
                 let target = safe_file(repo, path)?;
@@ -1333,13 +1988,29 @@ impl Git {
                     result.note = Some("这个对象不是普通文件，无法展示文本差异。".into());
                     return Ok(result);
                 }
-                let source = fs::File::open(target)?;
                 let mut bytes = vec![];
-                source
-                    .take((DIFF_LIMIT + 1) as u64)
-                    .read_to_end(&mut bytes)?;
-                result.truncated = bytes.len() > DIFF_LIMIT;
-                bytes.truncate(DIFF_LIMIT);
+                let uses_lfs = self.path_uses_lfs(repo, path, None, false)?;
+                if uses_lfs {
+                    let file = fs::File::open(target)?;
+                    let pointer =
+                        crate::lfs::clean(&mut &file, &mut bytes).map_err(|error| match error {
+                            crate::lfs::CleanError::UnsupportedExtension => Error::new(
+                                "unsupportedLfsExtension",
+                                "暂不支持含 Git LFS 扩展字段的指针文件。",
+                            ),
+                            crate::lfs::CleanError::Io(error) => error.into(),
+                        })?;
+                    let after = pointer
+                        .map(LfsPointer::from)
+                        .map_or_else(LfsSide::regular, LfsSide::pointer);
+                    result.lfs = Some(LfsDiff::from_sides(LfsSide::missing(), after));
+                } else {
+                    fs::File::open(target)?
+                        .take((DIFF_LIMIT + 1) as u64)
+                        .read_to_end(&mut bytes)?;
+                    result.truncated = bytes.len() > DIFF_LIMIT;
+                    bytes.truncate(DIFF_LIMIT);
+                }
                 if bytes.contains(&0) {
                     result.binary = true;
                     return Ok(result);
@@ -1371,7 +2042,11 @@ impl Git {
             args.extend(options);
             args.push("--");
             args.extend(owned_paths.iter().map(String::as_str));
-            self.run(repo, &args, DIFF_LIMIT, false)?
+            let output = self.run(repo, &args, DIFF_LIMIT, false)?;
+            if mode != "conflict" {
+                result.lfs = self.workspace_lfs_diff(repo, mode, &file)?;
+            }
+            output
         } else {
             return Err(Error::new("invalid", "差异类型无效。"));
         };
@@ -1772,6 +2447,123 @@ pub struct Diff {
     pub binary: bool,
     pub note: Option<String>,
     pub conflict: Option<Conflict>,
+    pub lfs: Option<LfsDiff>,
+}
+#[derive(Clone)]
+struct GitBlob {
+    mode: String,
+    oid: String,
+    stage: String,
+}
+struct IndexEntry {
+    mode: Vec<u8>,
+    oid: Vec<u8>,
+    path: Vec<u8>,
+}
+#[derive(Clone)]
+struct LfsSide {
+    pointer: Option<LfsPointer>,
+    state: LfsSideState,
+}
+impl LfsSide {
+    fn pointer(pointer: LfsPointer) -> Self {
+        Self {
+            pointer: Some(pointer),
+            state: LfsSideState::Pointer,
+        }
+    }
+    fn regular() -> Self {
+        Self {
+            pointer: None,
+            state: LfsSideState::Regular,
+        }
+    }
+    fn missing() -> Self {
+        Self {
+            pointer: None,
+            state: LfsSideState::Missing,
+        }
+    }
+    fn unsupported() -> Self {
+        Self {
+            pointer: None,
+            state: LfsSideState::Unsupported,
+        }
+    }
+}
+impl LfsDiff {
+    fn from_sides(before: LfsSide, after: LfsSide) -> Self {
+        Self {
+            before: before.pointer,
+            after: after.pointer,
+            before_state: before.state,
+            after_state: after.state,
+            conflict: None,
+        }
+    }
+}
+impl From<crate::lfs::Pointer> for LfsPointer {
+    fn from(pointer: crate::lfs::Pointer) -> Self {
+        Self {
+            oid: pointer.oid,
+            size: pointer.size,
+        }
+    }
+}
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LfsDiff {
+    pub before: Option<LfsPointer>,
+    pub after: Option<LfsPointer>,
+    pub before_state: LfsSideState,
+    pub after_state: LfsSideState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conflict: Option<bool>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LfsPointer {
+    pub oid: String,
+    pub size: u64,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LfsSideState {
+    Pointer,
+    Regular,
+    Missing,
+    Unsupported,
+}
+
+fn parse_index_blob_record(record: &[u8]) -> Option<GitBlob> {
+    let separator = record.iter().position(|byte| *byte == b'\t')?;
+    let header: Vec<_> = record[..separator]
+        .split(|byte| byte.is_ascii_whitespace())
+        .filter(|field| !field.is_empty())
+        .collect();
+    if header.len() < 3 {
+        return None;
+    }
+    Some(GitBlob {
+        mode: String::from_utf8_lossy(header[0]).into_owned(),
+        oid: String::from_utf8_lossy(header[1]).into_owned(),
+        stage: String::from_utf8_lossy(header[2]).into_owned(),
+    })
+}
+
+fn parse_tree_blob_record(record: &[u8]) -> Option<GitBlob> {
+    let separator = record.iter().position(|byte| *byte == b'\t')?;
+    let header: Vec<_> = record[..separator]
+        .split(|byte| byte.is_ascii_whitespace())
+        .filter(|field| !field.is_empty())
+        .collect();
+    if header.len() != 3 || header[1] != b"blob" {
+        return None;
+    }
+    Some(GitBlob {
+        mode: String::from_utf8_lossy(header[0]).into_owned(),
+        oid: String::from_utf8_lossy(header[2]).into_owned(),
+        stage: "0".into(),
+    })
 }
 #[derive(Clone, Serialize)]
 pub struct Conflict {

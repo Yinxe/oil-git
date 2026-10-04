@@ -61,6 +61,13 @@ export type CommitDetail = Commit & { files: CommitFile[]; comparison: string };
 export type ConflictLine = { line: number; text: string };
 export type Diff = {
   patch: string;
+  lfs?: null | {
+    conflict?: boolean;
+    before: { oid: string; size: number } | null;
+    after: { oid: string; size: number } | null;
+    beforeState?: "pointer" | "regular" | "missing" | "unsupported";
+    afterState?: "pointer" | "regular" | "missing" | "unsupported";
+  };
   truncated: boolean;
   binary: boolean;
   note: string | null;

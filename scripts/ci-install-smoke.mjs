@@ -84,7 +84,7 @@ try {
       mountPoint,
     ]);
     mounted = true;
-    const app = path.join(temporary, "installed", "oil-git.app");
+    const app = path.join(temporary, "安装 with space", "oil-git.app");
     run("ditto", [path.join(mountPoint, "oil-git.app"), app]);
     run("hdiutil", ["detach", mountPoint]);
     mounted = false;
@@ -101,7 +101,7 @@ try {
       "true",
       "Windows 安装检查只在临时 GitHub runner 运行，避免改动本机的安装记录与快捷方式。",
     );
-    resources = path.join(temporary, "installed");
+    resources = path.join(temporary, "安装 with space");
     // NSIS 的 /D 必须放最后，且参数不能加引号；它会读取余下的完整路径。
     run(candidates[0], ["/S", `/D=${resources}`], {
       timeout: 300_000,
@@ -202,6 +202,72 @@ try {
   check("读取前后文件、暂存区、引用和配置字节不变", () =>
     assert.deepEqual(fixtureContents(repo), before),
   );
+
+  const lfsRepo = path.join(temporary, "LFS 项目 with space");
+  fs.mkdirSync(lfsRepo);
+  const lfsGit = (args) =>
+    run("git", [
+      "-c",
+      "filter.lfs.process=",
+      "-c",
+      "filter.lfs.clean=",
+      "-c",
+      "filter.lfs.required=false",
+      "-C",
+      lfsRepo,
+      ...args,
+    ]);
+  // 测试数据直接暂存标准指针，构造过程也不依赖安装 git-lfs。
+  const stagePointers = () => lfsGit(["add", "."]);
+  const pointer = (content) =>
+    "version https://git-lfs.github.com/spec/v1\n" +
+    `oid sha256:${createHash("sha256").update(content).digest("hex")}\n` +
+    `size ${content.length}\n`;
+  lfsGit(["init", "-b", "main"]);
+  lfsGit(["config", "user.name", "CI fixture"]);
+  lfsGit(["config", "user.email", "fixture@example.invalid"]);
+  lfsGit(["config", "core.autocrlf", "false"]);
+  lfsGit(["config", "filter.lfs.clean", "git-lfs clean -- %f"]);
+  lfsGit(["config", "filter.lfs.smudge", "git-lfs smudge -- %f"]);
+  lfsGit(["config", "filter.lfs.process", "git-lfs filter-process"]);
+  lfsGit(["config", "filter.lfs.required", "true"]);
+  fs.writeFileSync(
+    path.join(lfsRepo, ".gitattributes"),
+    "*.bin filter=lfs diff=lfs merge=lfs -text\n",
+  );
+  const lfsFile = path.join(lfsRepo, "中文 文件.bin");
+  const original = Buffer.from("original\0LFS content\n");
+  fs.writeFileSync(lfsFile, pointer(original));
+  stagePointers();
+  lfsGit(["commit", "-m", "LFS 首次提交"]);
+  const inspectLfs = () => {
+    const response = inspect(cli, lfsRepo);
+    assert.equal(response.status, "ready");
+    return response.data;
+  };
+  check("未下载对象的 LFS 指针保持干净且只读", () => {
+    const unchanged = fixtureContents(lfsRepo);
+    assert.equal(inspectLfs().files.length, 0);
+    assert.deepEqual(fixtureContents(lfsRepo), unchanged);
+  });
+  fs.writeFileSync(lfsFile, original);
+  check("已展开 LFS 内容保持干净且不写对象", () => {
+    const unchanged = fixtureContents(lfsRepo);
+    assert.equal(inspectLfs().files.length, 0);
+    assert.deepEqual(fixtureContents(lfsRepo), unchanged);
+    assert.ok(!fs.existsSync(path.join(lfsRepo, ".git", "lfs")));
+  });
+  fs.writeFileSync(lfsFile, pointer(Buffer.from("staged\0content\n")));
+  stagePointers();
+  fs.writeFileSync(lfsFile, Buffer.from("working\0content\n"));
+  check("LFS 暂存与未暂存独立识别且只读", () => {
+    const unchanged = fixtureContents(lfsRepo);
+    const files = inspectLfs().files;
+    assert.equal(files.length, 1);
+    assert.ok(files[0].staged && files[0].unstaged);
+    assert.deepEqual(fixtureContents(lfsRepo), unchanged);
+    assert.ok(!fs.existsSync(path.join(lfsRepo, ".git", "lfs")));
+  });
   report.status = "passed";
 } catch (error) {
   report.status = "failed";

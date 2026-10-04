@@ -125,9 +125,7 @@ fn open_unborn_paths_and_missing_git() {
     assert_eq!(f.git.normalize(&empty).unwrap_err().kind, "notRepository");
     f.git.text(&empty, &["init", "--bare"], false).unwrap();
     assert_eq!(f.git.normalize(&empty).unwrap_err().kind, "bare");
-    let absent = Git {
-        binary: PathBuf::from("definitely-no-git-viewer-binary"),
-    };
+    let absent = Git::new(PathBuf::from("definitely-no-git-viewer-binary"));
     assert_eq!(
         absent
             .text(&f.repo, &["--version"], false)
@@ -328,7 +326,7 @@ fn unused_global_filter_does_not_block_a_read_only_snapshot() {
     )
     .unwrap();
     make_executable(&wrapper);
-    let git = Git { binary: wrapper };
+    let git = Git::new(wrapper);
     assert_eq!(git.snapshot(&f.repo).unwrap().files.len(), 0);
     assert!(!marker.exists());
 }
@@ -355,7 +353,7 @@ fn repeated_unused_filter_names_do_not_spawn_per_file_config_reads() {
     )
     .unwrap();
     make_executable(&wrapper);
-    let git = Git { binary: wrapper };
+    let git = Git::new(wrapper);
     let snapshot = git.snapshot(&f.repo).unwrap();
     assert!(snapshot.files.is_empty());
     let invocations = fs::metadata(&counter).unwrap().len();
@@ -370,9 +368,9 @@ fn repeated_unused_filter_names_do_not_spawn_per_file_config_reads() {
 #[test]
 fn inherited_git_environment_cannot_redirect_repository_or_replace_behavior() {
     if let Ok(repo_b) = std::env::var("OIL_GIT_TEST_TARGET_REPO") {
-        let git = Git {
-            binary: PathBuf::from(std::env::var_os("OIL_GIT_TEST_BINARY").unwrap()),
-        };
+        let git = Git::new(PathBuf::from(
+            std::env::var_os("OIL_GIT_TEST_BINARY").unwrap(),
+        ));
         let repo_b = PathBuf::from(repo_b);
         let expected_head = std::env::var("OIL_GIT_TEST_EXPECTED_HEAD").unwrap();
         let snapshot = git.snapshot(&repo_b).unwrap();
@@ -604,7 +602,7 @@ fn timeout_covers_descendants_that_keep_git_pipes_open() {
     )
     .unwrap();
     make_executable(&wrapper);
-    let wrapped = Git { binary: wrapper };
+    let wrapped = Git::new(wrapper);
     let start = Instant::now();
     let error = wrapped.text(&f.repo, &["--version"], false).unwrap_err();
     let elapsed = start.elapsed();
@@ -614,7 +612,7 @@ fn timeout_covers_descendants_that_keep_git_pipes_open() {
         "elapsed: {elapsed:?}"
     );
     assert!(child_pid.is_file());
-    assert!(Git { binary: real_git }
+    assert!(Git::new(real_git)
         .text(&f.repo, &["--version"], false)
         .unwrap()
         .starts_with("git version"));
@@ -753,7 +751,7 @@ fn snapshot_retries_when_index_changes_after_status_read() {
     let trigger = f._temp.path().join("stage-once");
     let wrapper = f._temp.path().join("git-wrapper.sh");
     let script = format!(
-        "#!/bin/sh\nREAL_GIT={}\nREPO={}\nTRIGGER={}\n\"$REAL_GIT\" \"$@\"\nresult=$?\nif [ \"$8\" = status ] && [ ! -e \"$TRIGGER\" ]; then\n  : > \"$TRIGGER\"\n  \"$REAL_GIT\" -C \"$REPO\" add -- tracked.txt\nfi\nexit \"$result\"\n",
+        "#!/bin/sh\nREAL_GIT={}\nREPO={}\nTRIGGER={}\nIS_STATUS=0\nfor arg in \"$@\"; do\n  if [ \"$arg\" = status ]; then IS_STATUS=1; fi\ndone\n\"$REAL_GIT\" \"$@\"\nresult=$?\nif [ \"$IS_STATUS\" = 1 ] && [ ! -e \"$TRIGGER\" ]; then\n  : > \"$TRIGGER\"\n  \"$REAL_GIT\" -C \"$REPO\" add -- tracked.txt\nfi\nexit \"$result\"\n",
         shell_quote(&f.git.binary.to_string_lossy()),
         shell_quote(&f.repo.to_string_lossy()),
         shell_quote(&trigger.to_string_lossy())

@@ -1,4 +1,5 @@
 pub mod git;
+pub mod lfs;
 use git::{Error, Git, Result};
 use notify::{RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -405,6 +406,27 @@ fn open_git_install(app: tauri::AppHandle) -> Result<()> {
 }
 pub fn run() {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|arg| arg == lfs::CLEAN_COMMAND) {
+        let status = if args.len() == 1 {
+            lfs::run_clean()
+        } else {
+            eprintln!("oil-git: invalid hidden LFS clean arguments");
+            2
+        };
+        std::process::exit(status);
+    }
+    if args
+        .first()
+        .is_some_and(|arg| arg == lfs::FILTER_PROCESS_COMMAND)
+    {
+        let status = if args.len() == 1 {
+            lfs::run_filter_process()
+        } else {
+            eprintln!("oil-git: invalid hidden LFS filter-process arguments");
+            2
+        };
+        std::process::exit(status);
+    }
     if args.first().is_some_and(|a| a == "--help" || a == "-h") {
         println!("oil-git 只读 Git 查看工具\n打开：oil-git open <项目路径> [--view changes|history]\n读取：oil-git inspect <项目路径> --json\nSkill：oil-git skill [--path]\n无参数启动桌面界面。");
         return;
