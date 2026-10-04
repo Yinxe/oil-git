@@ -191,7 +191,10 @@ try {
     verifySnapshot(inspect(launcher, repo)),
   );
   check("无效目录返回 JSON 错误和非零退出码", () => {
-    for (const command of [cli, launcher]) {
+    for (const [commandName, command] of [
+      ["程序", cli],
+      ["启动器", launcher],
+    ]) {
       for (const target of [temporary, path.join(temporary, "不存在")]) {
         assert.throws(
           () => inspect(command, target),
@@ -202,6 +205,7 @@ try {
             assert.ok(response.kind && response.message);
             return true;
           },
+          `${commandName} 应拒绝目录：${target}`,
         );
       }
     }
