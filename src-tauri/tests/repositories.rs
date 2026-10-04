@@ -491,8 +491,17 @@ fn submodule_head_change_invalidates_the_working_revision() {
         .unwrap();
     f.commit("record submodule");
 
-    let before = f.git.snapshot(&f.repo).unwrap();
     let nested_path = f.repo.join("nested");
+    // A clone does not inherit its source repository's local author identity.
+    for (key, value) in [
+        ("user.name", "验证用户"),
+        ("user.email", "test@example.invalid"),
+    ] {
+        f.git
+            .text(&nested_path, &["config", key, value], false)
+            .unwrap();
+    }
+    let before = f.git.snapshot(&f.repo).unwrap();
     let before_head = f
         .git
         .text(&nested_path, &["rev-parse", "HEAD"], false)
