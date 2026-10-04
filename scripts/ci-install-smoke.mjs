@@ -251,6 +251,22 @@ try {
     assert.deepEqual(fixtureContents(lfsRepo), unchanged);
   });
   fs.writeFileSync(lfsFile, original);
+  // 在临时仓库记录已展开文件的 stat；手改指针后不暂存，Git 自身也会报 M。
+  // 使用随包转换器构造同一对象，不依赖 git-lfs 或写入 LFS 对象库。
+  const filterExecutable =
+    process.platform === "win32"
+      ? executable.replaceAll("\\", "/")
+      : executable;
+  const bundledFilter = `'${filterExecutable.replaceAll("'", "'\\''")}' __oil_lfs_filter_process`;
+  lfsGit([
+    "-c",
+    `filter.lfs.process=${bundledFilter}`,
+    "-c",
+    "filter.lfs.required=true",
+    "add",
+    "--",
+    "中文 文件.bin",
+  ]);
   check("已展开 LFS 内容保持干净且不写对象", () => {
     const unchanged = fixtureContents(lfsRepo);
     assert.equal(inspectLfs().files.length, 0);
