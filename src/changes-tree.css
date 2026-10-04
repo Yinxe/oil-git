@@ -1,0 +1,49 @@
+.changes-tree .change-directory {
+  min-width: 0;
+}
+
+.changes-tree .change-directory-heading {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px 7px calc(18px + var(--change-tree-indent, 0px));
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+}
+
+.changes-tree .change-directory-heading > span {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changes-tree .change-directory-heading > svg {
+  transform: rotate(90deg);
+  transition: transform var(--fast);
+}
+
+.changes-tree .change-directory-heading[aria-expanded="false"] > svg {
+  transform: none;
+}
+
+.changes-tree .source-file {
+  padding-left: calc(18px + var(--change-tree-indent, 0px));
+}
+
+@media (max-width: 900px) {
+  .persistent-sidebar .changes-tree .source-file {
+    padding-left: calc(12px + var(--change-tree-indent, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .changes-tree .change-directory-heading > svg {
+    transition: none;
+  }
+}

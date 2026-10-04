@@ -1,0 +1,129 @@
+.diff-result .code-diff-viewport {
+  overflow-x: hidden;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+.diff-result .code-diff-viewport .code-spacer {
+  width: 100%;
+  min-width: 0;
+}
+
+.diff-result .code-diff-viewport .virtual-code-row {
+  box-sizing: border-box;
+  display: flex;
+  left: 0;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  line-height: 24px;
+  align-items: flex-start;
+}
+
+.diff-result .code-diff-viewport .code-row {
+  white-space: normal;
+}
+.diff-result .code-diff-viewport .code-line-measure {
+  position: static;
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  min-height: 24px;
+  height: auto;
+}
+.diff-result .code-line-slot.add {
+  background: var(--add-bg);
+}
+.diff-result .code-line-slot.remove {
+  background: var(--remove-bg);
+}
+
+.diff-result .code-diff-viewport .line-number {
+  box-sizing: border-box;
+  flex: 0 0 36px;
+  white-space: nowrap;
+}
+
+.diff-result .code-diff-viewport .code-text {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 24px;
+}
+
+.diff-result .raw-patch-viewport {
+  height: clamp(150px, 40vh, 480px);
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.diff-result .code-diff-viewport.raw-code-viewport {
+  height: clamp(150px, 40vh, 480px);
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.diff-result .split-side .line-number {
+  flex-basis: 42px;
+}
+
+.diff-result .split-editor.code-diff-split {
+  grid-template-columns:
+    minmax(0, var(--diff-left-track, 1fr)) 6px
+    minmax(0, var(--diff-right-track, 1fr));
+  column-gap: 0;
+}
+
+.diff-result .code-diff-split > .split-side:first-of-type {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.diff-result .code-diff-split > .split-side:last-of-type {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.diff-result .code-diff-divider {
+  grid-column: 2;
+  grid-row: 1;
+  width: 6px;
+  min-height: 0;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  z-index: 1;
+  background: transparent;
+  transition: background-color var(--fast);
+}
+
+.diff-result .code-diff-divider:hover,
+.diff-result .code-diff-divider:focus-visible,
+.diff-result .code-diff-split[data-resizing="true"] .code-diff-divider {
+  background: var(--selection);
+}
+
+.diff-result .code-diff-split[data-resizing="true"],
+.diff-result .code-diff-split[data-resizing="true"] * {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.diff-result .patch {
+  overflow-x: hidden;
+}
+
+.diff-result .patch .code-row {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+}
+
+.diff-result .patch .code-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

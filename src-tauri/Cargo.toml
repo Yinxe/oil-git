@@ -1,0 +1,40 @@
+[package]
+name = "oil-git"
+version = "0.1.0"
+edition = "2021"
+description = "只读 Git 可视化桌面工具"
+license = "MIT"
+repository = "https://github.com/oil-oil/oil-git"
+
+[lib]
+name = "oil_git_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+notify = "8"
+dunce = "1"
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+filetime = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+] }

@@ -1,0 +1,27 @@
+#!/bin/sh
+# Agent 入口；不修改项目，不依赖 Node/Python。
+if [ -n "${OIL_GIT_APP:-}" ]; then
+  task_app_path="$OIL_GIT_APP"
+elif [ "${0%/Contents/Resources/bin/oil-git}" != "$0" ]; then
+  task_app_path="${0%/Contents/Resources/bin/oil-git}"
+elif [ -d '/Applications/oil-git.app' ]; then
+  task_app_path='/Applications/oil-git.app'
+elif [ -d "$HOME/Applications/oil-git.app" ]; then
+  task_app_path="$HOME/Applications/oil-git.app"
+else
+  printf '%s\n' '没有找到 oil-git.app。请安装应用，或设置 OIL_GIT_APP 为应用的完整路径。' >&2
+  exit 1
+fi
+case "${1:-}" in
+  --help|-h|--version|skill|inspect) exec "$task_app_path/Contents/MacOS/oil-git" "$@" ;;
+esac
+if [ "${1:-}" = 'open' ] && [ "$#" -ge 2 ]; then
+  task_repo_path="$2"
+  case "$task_repo_path" in
+    /*) ;;
+    *) task_repo_path="$PWD/$task_repo_path" ;;
+  esac
+  shift 2
+  set -- open "$task_repo_path" "$@"
+fi
+exec /usr/bin/open -n -a "$task_app_path" --args "$@"
