@@ -25,7 +25,6 @@ export default function App() {
   const [locate, setLocate] = useState(0);
   const shell = useRef<HTMLDivElement>(null);
   const panes = usePaneLayout(shell);
-  const [focused, setFocused] = useState(() => document.hasFocus());
   const [detailState, setDetailState] = useState<
     DetailState & { owner: string }
   >({ owner: "", ready: false, loading: false, error: null });
@@ -106,15 +105,6 @@ export default function App() {
     if (!effectiveSelection) wasDetailOpen.current = false;
     else if (detailOpen) wasDetailOpen.current = true;
   }, [detailOpen, effectiveSelection]);
-  useEffect(() => {
-    const focus = () => setFocused(document.hasFocus());
-    window.addEventListener("focus", focus);
-    window.addEventListener("blur", focus);
-    return () => {
-      window.removeEventListener("focus", focus);
-      window.removeEventListener("blur", focus);
-    };
-  }, []);
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
@@ -243,7 +233,6 @@ export default function App() {
   return (
     <div
       ref={shell}
-      data-window-focused={focused}
       className={
         "app " +
         (mac ? "mac " : "") +
@@ -616,6 +605,7 @@ export default function App() {
                   inert={!detailOpen}
                 >
                   <Details
+                    commits={repo.history.commits}
                     key={repo.project.repoId}
                     project={repo.project}
                     selection={

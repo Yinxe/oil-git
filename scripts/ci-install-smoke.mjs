@@ -141,7 +141,17 @@ try {
 
   const repo = path.join(temporary, "项目 with space");
   fs.mkdirSync(repo);
-  const git = (args) => run("git", ["-C", repo, ...args]);
+  // 夹具写入不启动后台维护；审计仍包括所有文件和锁文件。
+  const git = (args) =>
+    run("git", [
+      "-c",
+      "maintenance.auto=false",
+      "-c",
+      "gc.auto=0",
+      "-C",
+      repo,
+      ...args,
+    ]);
   git(["init", "-b", "main"]);
   git(["config", "user.name", "CI fixture"]);
   git(["config", "user.email", "fixture@example.invalid"]);
@@ -218,6 +228,10 @@ try {
   fs.mkdirSync(lfsRepo);
   const lfsGit = (args) =>
     run("git", [
+      "-c",
+      "maintenance.auto=false",
+      "-c",
+      "gc.auto=0",
       "-c",
       "filter.lfs.process=",
       "-c",

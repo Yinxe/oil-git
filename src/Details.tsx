@@ -5,6 +5,7 @@ import { FileIcon } from "./FileIcon";
 import { ReadStatus } from "./ReadStatus";
 import { useCommitView } from "./useCommitView";
 import { CommitMetadata } from "./CommitMetadata";
+import { useCommitMotion } from "./useCommitMotion";
 import type { GitError, Project, Selection } from "./types";
 
 export type DetailState = {
@@ -20,6 +21,7 @@ export function Details({
   onStateChange,
   subject,
   keepPrevious = true,
+  commits = [],
 }: {
   project: Project;
   selection: Selection;
@@ -27,6 +29,7 @@ export function Details({
   active?: boolean;
   subject?: string;
   keepPrevious?: boolean;
+  commits?: readonly { hash: string }[];
   onStateChange?: (state: DetailState) => void;
 }) {
   const view = useCommitView(project, selection, shown);
@@ -39,6 +42,11 @@ export function Details({
       : null;
   const stash = selection?.kind === "stashes";
   const ready = stash || !!data || !!view.error;
+  const content = useCommitMotion(
+    stash ? null : (data?.detail.hash ?? null),
+    commits,
+    shown && !!selection,
+  );
   useLayoutEffect(() => {
     onStateChange?.({ ready, loading: view.loading, error: view.error });
   }, [ready, view.loading, view.error, onStateChange]);
@@ -50,6 +58,7 @@ export function Details({
       {ready && (
         <div
           className="detail-content"
+          ref={content}
           key={stash ? "stashes" : (data?.detail.hash ?? "error")}
         >
           <header className="details-header">

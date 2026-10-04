@@ -13,11 +13,9 @@ button:disabled {
   cursor: default;
   opacity: 0.45;
 }
-button:focus-visible,
-select:focus-visible,
-summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+:focus,
+:focus-visible {
+  outline: none;
 }
 button:hover:not(:disabled) {
   background: var(--hover);
@@ -61,7 +59,6 @@ kbd {
   overflow: auto;
   flex: 1;
   min-height: 0;
-  outline-offset: -2px !important;
 }
 .graph-content {
   position: relative;
@@ -76,7 +73,6 @@ kbd {
 }
 .graph-viewport:focus-visible .keyboard-row {
   background: var(--selection);
-  box-shadow: inset 0 0 0 1px var(--selection);
 }
 .history-bottom > span {
   margin-right: auto;
@@ -721,15 +717,6 @@ button {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  animation: detail-content-in 150ms var(--ease);
-}
-@keyframes detail-content-in {
-  from {
-    opacity: 0.65;
-  }
-  to {
-    opacity: 1;
-  }
 }
 .details-header {
   min-height: 61px;
@@ -1212,14 +1199,6 @@ button {
 }
 .virtual-diff > .inline-note {
   flex-shrink: 0;
-}
-.code-viewport:focus,
-.patch:focus,
-.graph-viewport:focus {
-  outline: none;
-}
-.app[data-window-focused="false"] :focus-visible {
-  outline: none;
 }
 @media (max-width: 900px) {
   .editor-heading {

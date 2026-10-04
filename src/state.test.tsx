@@ -759,6 +759,62 @@ describe("真实组件的请求顺序", () => {
     filePath,
     diff: commitDiff(content),
   });
+  it("完整详情按已显示节点的方向滑入，乱序响应与换文件不重播", async () => {
+    const original = Element.prototype.animate;
+    const cancel = vi.fn();
+    const animate = vi.fn<Element["animate"]>(
+      () => ({ cancel }) as unknown as Animation,
+    );
+    Element.prototype.animate = animate;
+    try {
+      const p = project("motion"),
+        commits = [{ hash: "a" }, { hash: "b" }, { hash: "c" }];
+      const detail = (hash: string) => (
+        <Details
+          project={p}
+          selection={{ kind: "commit", hash }}
+          commits={commits}
+          onClose={() => {}}
+        />
+      );
+      const { rerender, container } = render(detail("a"));
+      await answer(take("get_commit_view"), combined("a", "A", "内容 A"));
+      expect(animate).not.toHaveBeenCalled();
+      rerender(detail("c"));
+      const old = take("get_commit_view");
+      rerender(detail("b"));
+      const latest = take("get_commit_view");
+      expect(screen.getByText("A")).toBeTruthy();
+      expect(animate).not.toHaveBeenCalled();
+      await answer(latest, combined("b", "B", "内容 B"));
+      expect(screen.getByText("B")).toBeTruthy();
+      expect(screen.getByText("+内容 B")).toBeTruthy();
+      expect(animate.mock.calls[0][0]).toEqual([
+        { transform: "translateY(-12px)", opacity: 0.94 },
+        { transform: "translateY(0)", opacity: 1 },
+      ]);
+      await answer(old, combined("c", "C", "过期内容"));
+      expect(screen.queryByText("C")).toBeNull();
+      expect(animate).toHaveBeenCalledTimes(1);
+      rerender(detail("a"));
+      await waitFor(() => expect(screen.getByText("A")).toBeTruthy());
+      expect(animate.mock.calls[1][0]).toEqual([
+        { transform: "translateY(12px)", opacity: 0.94 },
+        { transform: "translateY(0)", opacity: 1 },
+      ]);
+      expect(cancel).toHaveBeenCalledTimes(1);
+      const viewport = container.querySelector(".diff-scroll");
+      fireEvent.click(screen.getByRole("button", { name: /second.txt/ }));
+      await answer(
+        take("get_commit_view"),
+        combined("a", "A", "第二个文件", "second.txt"),
+      );
+      expect(container.querySelector(".diff-scroll")).toBe(viewport);
+      expect(animate).toHaveBeenCalledTimes(2);
+    } finally {
+      Element.prototype.animate = original;
+    }
+  });
   it("提交一次读取后整体显示，未返回前没有占位标题", async () => {
     const p = project("main"),
       selection = { kind: "commit" as const, hash: p.snapshot.head! };
