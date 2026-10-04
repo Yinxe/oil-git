@@ -164,7 +164,14 @@ try {
   const verifySnapshot = (response) => {
     assert.equal(response.status, "ready");
     const snapshot = response.data;
-    assert.equal(fs.realpathSync(snapshot.path), fs.realpathSync(repo));
+    // Windows TEMP may use an 8.3 alias while Rust returns the long path.
+    // Compare actual directory identity, not two spellings of the same path.
+    const expectedRoot = fs.statSync(repo, { bigint: true });
+    const actualRoot = fs.statSync(snapshot.path, { bigint: true });
+    assert.ok(actualRoot.isDirectory());
+    assert.notEqual(expectedRoot.ino, 0n, "文件系统未提供可验证的目录标识");
+    assert.equal(actualRoot.dev, expectedRoot.dev);
+    assert.equal(actualRoot.ino, expectedRoot.ino);
     assert.equal(snapshot.branch, "main");
     assert.equal(snapshot.files.length, 2);
     const tracked = snapshot.files.find((file) => file.path === "源码/应用.ts");
