@@ -13,8 +13,8 @@
     "prebuild": "node scripts/prepare-assets.mjs",
     "predev": "node scripts/prepare-assets.mjs",
     "pretest": "node scripts/prepare-assets.mjs",
-    "format": "prettier --write src scripts package.json tsconfig.json README*.md CONTRIBUTING.md AGENTS.md THIRD-PARTY-NOTICES.md docs .github skills/oil-git index.html 'src-tauri/tauri*.conf.json'",
-    "format:check": "prettier --check src scripts package.json tsconfig.json README*.md CONTRIBUTING.md AGENTS.md THIRD-PARTY-NOTICES.md docs .github skills/oil-git index.html 'src-tauri/tauri*.conf.json'"
+    "format": "prettier --write src scripts package.json tsconfig.json README*.md CONTRIBUTING.md AGENTS.md THIRD-PARTY-NOTICES.md docs .github skills/oil-git index.html \"src-tauri/tauri*.conf.json\"",
+    "format:check": "prettier --check src scripts package.json tsconfig.json README*.md CONTRIBUTING.md AGENTS.md THIRD-PARTY-NOTICES.md docs .github skills/oil-git index.html \"src-tauri/tauri*.conf.json\""
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
