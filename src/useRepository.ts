@@ -42,7 +42,11 @@ export function useRepository() {
   }>({ loading: true });
   const [openError, setOpenError] = useState<GitError | null>(null);
   const [snapshotError, setSnapshotError] = useState<GitError | null>(null);
-  const failedOpen = useRef<{ path: string; view?: string } | null>(null);
+  const failedOpen = useRef<{
+    path: string;
+    view?: string;
+    forgotten: Set<string>;
+  } | null>(null);
   const [opening, setOpening] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [history, setHistory] = useState<History>(empty);
@@ -147,7 +151,7 @@ export function useRepository() {
       }
       flight.current = target.repoId;
       const ticket = stateGate.current.next();
-      if (showBusy) setRefreshing(true);
+      if (showBusy || reason !== "poll") setRefreshing(true);
       try {
         const snapshot = await request<Snapshot>("get_snapshot", {
           repoId: target.repoId,
@@ -195,14 +199,14 @@ export function useRepository() {
     [loadHistory],
   );
   const openPath = useCallback(
-    async (path: string, view?: string) => {
+    async (path: string, view?: string, retryIntent?: Set<string>) => {
       hasOpenIntent.current = true;
       setRecentError(null);
-      const forgottenForThisOpen = new Set<string>();
+      const forgottenForThisOpen = retryIntent ?? new Set<string>();
       recentOpenIntent.current = forgottenForThisOpen;
       const ticket = openGate.current.next();
       setOpening(true);
-      failedOpen.current = { path, view };
+      failedOpen.current = { path, view, forgotten: forgottenForThisOpen };
       setOpenError(null);
       try {
         const next = await request<Project>("open_repository", { path });
@@ -335,6 +339,30 @@ export function useRepository() {
     };
   }, [checkGit]);
   useEffect(() => {
+    if (opening) return;
+    const target = failedOpen.current;
+    const retryOpen = openError?.kind === "changing" && !!target;
+    if (!retryOpen && (snapshotError?.kind !== "changing" || refreshing))
+      return;
+    // 连续写入不是读取失败；等仓库稍微稳定后重新取一致的快照。
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      clearTimeout(timer);
+      if (document.visibilityState === "visible")
+        timer = setTimeout(() => {
+          if (retryOpen && target)
+            void openPath(target.path, target.view, target.forgotten);
+          else void refresh();
+        }, 750);
+    };
+    schedule();
+    document.addEventListener("visibilitychange", schedule);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", schedule);
+    };
+  }, [openError, opening, openPath, snapshotError, refreshing, refresh]);
+  useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
     // Agent 常在其他窗口修改项目；可见的观察窗口仍接收真实变化通知。
@@ -393,9 +421,20 @@ export function useRepository() {
     recentError,
     forgettingRecent,
     gitStatus,
-    error: openError ?? snapshotError,
+    error: openError
+      ? openError.kind === "changing"
+        ? null
+        : openError
+      : snapshotError?.kind === "changing"
+        ? null
+        : snapshotError,
     opening,
     refreshing,
+    syncing:
+      opening ||
+      refreshing ||
+      snapshotError?.kind === "changing" ||
+      openError?.kind === "changing",
     history,
     reference,
     viewRequest,

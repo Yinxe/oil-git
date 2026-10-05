@@ -63,14 +63,20 @@ export function Details({
           key={stash ? "stashes" : (data?.detail.hash ?? "error")}
         >
           <header className="details-header">
-            <h2>
-              {stash
-                ? "临时保存"
-                : (data?.detail.subject ?? subject ?? "无法读取提交")}
-            </h2>
-            {!stash && data && (
-              <CopyButton text={data.detail.subject} label="复制提交标题" />
-            )}
+            <div className="detail-title-group">
+              <h2>
+                {stash
+                  ? "临时保存"
+                  : (data?.detail.subject ?? subject ?? "无法读取提交")}
+              </h2>
+              {!stash && data && (
+                <CopyButton
+                  quiet
+                  text={data.detail.subject}
+                  label="复制提交标题"
+                />
+              )}
+            </div>
             <button
               className="icon-button"
               onClick={onClose}
@@ -98,10 +104,6 @@ export function Details({
                     <span>
                       {new Date(data.detail.date).toLocaleDateString("zh-CN")}
                     </span>
-                    <CopyButton
-                      text={`${data.detail.author}${data.detail.authorEmail ? ` <${data.detail.authorEmail}>` : ""}`}
-                      label="复制提交作者"
-                    />
                   </p>
                   <p>
                     {data.detail.comparison} · {data.detail.files.length} 个文件

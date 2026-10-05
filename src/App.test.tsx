@@ -77,6 +77,7 @@ beforeEach(() => {
     error: null,
     opening: false,
     refreshing: false,
+    syncing: false,
     reference: "all",
     viewRequest: null,
     history: {
@@ -102,6 +103,7 @@ beforeEach(() => {
     refresh: vi.fn(),
     checkGit: vi.fn(),
     clearError: vi.fn(),
+    retryError: vi.fn(),
     filter: vi.fn(),
     more: vi.fn(),
   };
@@ -127,6 +129,25 @@ const resolve = async (index: number, text: string) =>
     }),
   );
 describe("常驻侧栏与右侧视图", () => {
+  it("同步保留提交内容并使用顶部进度，真正失败仍提示旧结果并可重试", () => {
+    vi.useFakeTimers();
+    repo.syncing = true;
+    const view = render(<App />);
+    act(() => vi.advanceTimersByTime(200));
+    expect(
+      screen.getByRole("progressbar", { name: "正在同步仓库" }),
+    ).toBeTruthy();
+    expect(screen.getByText("真实提交")).toBeTruthy();
+    expect(document.querySelector(".error-banner")).toBeNull();
+    repo.syncing = false;
+    repo.error = { kind: "io", message: "目录无法读取" };
+    view.rerender(<App />);
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.getByText(/目录无法读取.*保留上次读取的结果/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    expect(repo.retryError).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
   it("移除最近项目失败时保留菜单行，不打开项目并在菜单内提示", async () => {
     repo.recents = [{ path: "/other", name: "other" }];
     repo.forgetRecent = vi.fn().mockResolvedValue(false);

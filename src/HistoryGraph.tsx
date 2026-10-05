@@ -210,16 +210,23 @@ export function HistoryGraph({
               }}
             >
               <div className="commit-title-line">
-                <button
-                  className="commit-select"
-                  tabIndex={-1}
-                  aria-pressed={selected === c.hash}
-                  title={c.subject}
-                >
-                  <span className="commit-title">
-                    {c.subject || "无提交说明"}
-                  </span>
-                </button>
+                <div className="commit-title-group">
+                  <button
+                    className="commit-select"
+                    tabIndex={-1}
+                    aria-pressed={selected === c.hash}
+                    title={c.subject}
+                  >
+                    <span className="commit-title">
+                      {c.subject || "无提交说明"}
+                    </span>
+                  </button>
+                  <CopyButton
+                    quiet
+                    text={`${c.subject}\n${c.hash}`}
+                    label="复制提交标题与 ID"
+                  />
+                </div>
                 <span
                   className="commit-row-author"
                   title={
@@ -228,52 +235,40 @@ export function HistoryGraph({
                 >
                   {c.author}
                 </span>
-                <CopyButton
-                  quiet
-                  text={`${c.subject}\n${c.hash}`}
-                  label="复制提交标题与 ID"
-                />
               </div>
               {(refs.length > 0 || c.hash === snapshot.head) && (
                 <span className="commit-refs">
                   {refs.map((r) => (
-                    <span className="ref-with-copy" key={r.fullName}>
-                      <span
-                        key={r.fullName}
-                        className={"ref " + r.kind}
-                        title={r.name}
-                        aria-label={r.name}
-                        style={
-                          r.kind === "branch"
-                            ? {
-                                color,
-                                backgroundColor:
-                                  "var(--lane-bg-" +
-                                  (graph.positions.get(c.hash)!.lane %
-                                    COLORS.length) +
-                                  ")",
-                              }
-                            : undefined
-                        }
-                      >
-                        {r.name.length > 36 ? (
-                          <>
-                            <span className="ref-prefix">
-                              {r.name.slice(0, -12)}
-                            </span>
-                            <span className="ref-suffix">
-                              {r.name.slice(-12)}
-                            </span>
-                          </>
-                        ) : (
-                          r.name
-                        )}
-                      </span>
-                      <CopyButton
-                        quiet
-                        text={r.name}
-                        label={`复制${r.kind === "tag" ? "标签" : "分支"}名称：${r.name}`}
-                      />
+                    <span
+                      key={r.fullName}
+                      className={"ref " + r.kind}
+                      title={r.name}
+                      aria-label={r.name}
+                      style={
+                        r.kind === "branch"
+                          ? {
+                              color,
+                              backgroundColor:
+                                "var(--lane-bg-" +
+                                (graph.positions.get(c.hash)!.lane %
+                                  COLORS.length) +
+                                ")",
+                            }
+                          : undefined
+                      }
+                    >
+                      {r.name.length > 36 ? (
+                        <>
+                          <span className="ref-prefix">
+                            {r.name.slice(0, -12)}
+                          </span>
+                          <span className="ref-suffix">
+                            {r.name.slice(-12)}
+                          </span>
+                        </>
+                      ) : (
+                        r.name
+                      )}
                     </span>
                   ))}
                   {c.hash === snapshot.head && (

@@ -594,6 +594,116 @@ describe("真实组件的请求顺序", () => {
     expect(result.current.history.snapshot?.head).toBe(newHead);
     expect(result.current.history.snapshot?.refs).toEqual(updated.refs);
   });
+  it("打开持续变化的仓库自动重读不恢复已移除记录，主动选择新项目取消待重读", async () => {
+    const { result } = renderHook(() => useRepository());
+    await waitFor(() => expect(result.current.gitStatus.version).toBeTruthy());
+    vi.useFakeTimers();
+    act(() => void result.current.openPath("busy", "changes"));
+    await fail(take("open_repository"), {
+      kind: "changing",
+      message: "Git 正在变化",
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.syncing).toBe(true);
+    act(() => void result.current.forgetRecent("busy"));
+    await act(async () => {});
+    await answer(take("forget_recent_repository"), []);
+    act(() => vi.advanceTimersByTime(750));
+    const retry = take("open_repository");
+    expect(retry.args.path).toBe("busy");
+    expect(result.current.syncing).toBe(true);
+    await answer(retry, project("busy"));
+    expect(request).toHaveBeenCalledWith("activate_repository", {
+      repoId: "busy",
+      remember: false,
+    });
+    expect(result.current.viewRequest?.view).toBe("changes");
+    expect(result.current.syncing).toBe(false);
+    act(() => void result.current.openPath("busy-next"));
+    await fail(take("open_repository"), {
+      kind: "changing",
+      message: "Git 正在变化",
+    });
+    act(() => vi.advanceTimersByTime(500));
+    act(() => void result.current.openPath("new"));
+    await answer(take("open_repository"), project("new"));
+    act(() => vi.advanceTimersByTime(750));
+    expect(queue.some((p) => p.command === "open_repository")).toBe(false);
+    expect(result.current.project?.repoId).toBe("new");
+    expect(result.current.syncing).toBe(false);
+  });
+  it("持续变化保留旧快照并显示同步，暂停隐藏窗口的重读，稳定后整体更新", async () => {
+    const { result } = renderHook(() => useRepository());
+    await waitFor(() => expect(result.current.gitStatus.version).toBeTruthy());
+    act(() => void result.current.openPath("main"));
+    await answer(take("open_repository"), project("main"));
+    await answer(take("get_history"), {
+      commits: [],
+      hasMore: false,
+      revision: "one",
+    });
+    vi.useFakeTimers();
+    const visibility = vi.spyOn(document, "visibilityState", "get");
+    visibility.mockReturnValue("visible");
+    act(() => void result.current.refresh());
+    expect(result.current.syncing).toBe(true);
+    await fail(take("get_snapshot"), {
+      kind: "changing",
+      message: "Git 正在变化",
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.syncing).toBe(true);
+    expect(result.current.project?.snapshot.changesRevision).toBe("one");
+    visibility.mockReturnValue("hidden");
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    act(() => vi.advanceTimersByTime(750));
+    expect(queue.some((p) => p.command === "get_snapshot")).toBe(false);
+    visibility.mockReturnValue("visible");
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    act(() => vi.advanceTimersByTime(750));
+    await answer(take("get_snapshot"), {
+      ...snapshot("main"),
+      changesRevision: "two",
+    });
+    expect(result.current.project?.snapshot.changesRevision).toBe("two");
+    expect(result.current.syncing).toBe(false);
+    visibility.mockRestore();
+  });
+  it("同步重读遇到真实错误停止流光，换仓库取消旧仓库的待重读", async () => {
+    const { result } = renderHook(() => useRepository());
+    await waitFor(() => expect(result.current.gitStatus.version).toBeTruthy());
+    act(() => void result.current.openPath("main"));
+    await answer(take("open_repository"), project("main"));
+    await answer(take("get_history"), {
+      commits: [],
+      hasMore: false,
+      revision: "one",
+    });
+    vi.useFakeTimers();
+    act(() => void result.current.refresh());
+    await fail(take("get_snapshot"), {
+      kind: "changing",
+      message: "Git 正在变化",
+    });
+    act(() => vi.advanceTimersByTime(750));
+    await fail(take("get_snapshot"), { kind: "io", message: "目录无法读取" });
+    expect(result.current.syncing).toBe(false);
+    expect(result.current.error?.message).toBe("目录无法读取");
+    expect(result.current.project?.repoId).toBe("main");
+    act(() => vi.advanceTimersByTime(750));
+    expect(queue.some((p) => p.command === "get_snapshot")).toBe(false);
+    act(() => result.current.retryError());
+    await fail(take("get_snapshot"), {
+      kind: "changing",
+      message: "Git 正在变化",
+    });
+    act(() => void result.current.openPath("next"));
+    await answer(take("open_repository"), project("next"));
+    act(() => vi.advanceTimersByTime(750));
+    expect(queue.some((p) => p.command === "get_snapshot")).toBe(false);
+    expect(result.current.project?.repoId).toBe("next");
+    expect(result.current.syncing).toBe(false);
+  });
   it("慢读取中的定时补查不排队，真实变化只合并补查一次", async () => {
     const { result } = renderHook(() => useRepository());
     await waitFor(() => expect(result.current.gitStatus.version).toBeTruthy());

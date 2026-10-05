@@ -58,6 +58,10 @@ kbd {
 .copy-button {
   width: 24px;
   height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  flex: 0 0 24px;
+  box-sizing: border-box;
   padding: 4px;
   border: 0;
   background: transparent;
@@ -75,14 +79,26 @@ kbd {
   color: var(--error-fg);
 }
 .copy-quiet {
+  opacity: 0;
   visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--fast),
+    visibility 0s linear var(--fast),
+    background-color var(--fast),
+    color var(--fast);
 }
 .commit-row:hover .copy-quiet,
 .commit-row:focus-within .copy-quiet,
+.details-header:hover .copy-quiet,
+.details-header:focus-within .copy-quiet,
 .graph-viewport:focus-visible .keyboard-row .copy-quiet,
 .copy-quiet[data-status="copied"],
 .copy-quiet[data-status="error"] {
   visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 .sr-only {
   position: absolute;
@@ -205,10 +221,17 @@ kbd {
   width: 100%;
   min-width: 0;
 }
+.commit-title-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
 .commit-select {
   text-align: left;
   display: block;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   padding: 0;
   background: transparent;
@@ -221,16 +244,6 @@ kbd {
 }
 .commit-row:hover {
   background: var(--hover);
-}
-.ref-with-copy {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  gap: 2px;
-}
-.ref-with-copy .copy-button {
-  width: 20px;
-  height: 20px;
 }
 .graph-viewport {
   overflow: auto;
@@ -422,9 +435,6 @@ kbd {
 .stash-item p {
   margin-top: 6px;
 }
-.status-dot.error {
-  background: var(--error-fg);
-}
 .error-banner {
   padding: 11px 28px;
   display: flex;
@@ -527,14 +537,39 @@ kbd {
     max-height: 30%;
   }
 }
-@media (prefers-reduced-motion: no-preference) {
-  .refreshing svg {
-    animation: rotate 1.5s linear infinite;
+.sync-indicator {
+  position: absolute;
+  inset: auto 0 -2px;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 20;
+}
+.sync-indicator::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: repository-sync 1.4s ease-in-out infinite;
+}
+@keyframes repository-sync {
+  from {
+    transform: translateX(-100%);
   }
-  @keyframes rotate {
-    to {
-      transform: rotate(360deg);
-    }
+  to {
+    transform: translateX(286%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .copy-quiet {
+    transition: none;
+  }
+  .sync-indicator::after {
+    animation: none;
+    transform: none;
+    width: 100%;
+    background: var(--accent);
   }
 }
 /* 自绘桌面组件：统一运动、层级与信息密度。 */
@@ -548,6 +583,7 @@ button {
     border-color var(--fast);
 }
 .toolbar {
+  position: relative;
   height: 60px;
   min-height: 60px;
   padding: 0 24px;
@@ -824,17 +860,6 @@ button {
   border-radius: 4px;
   background: var(--surface);
 }
-.readonly-label {
-  color: var(--faint);
-  font-size: 10px;
-  margin-left: 15px;
-}
-.status-dot {
-  width: 4px;
-  height: 4px;
-  background: var(--muted);
-  border-radius: 50%;
-}
 .workspace {
   display: grid;
   flex: 1;
@@ -903,12 +928,20 @@ button {
   gap: 12px;
   flex-shrink: 0;
 }
+.detail-title-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
 .details-header h2 {
   font-size: 14px;
   font-weight: 500;
   line-height: 1.7;
   overflow-wrap: anywhere;
-  flex: 1;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 .details-header .icon-button:not(.copy-button) {
   margin-top: -3px;
@@ -1492,17 +1525,6 @@ button {
   color: var(--faint);
   background: var(--editor-header);
 }
-.statusbar {
-  height: 26px;
-  min-height: 26px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 24px;
-  font-size: 10px;
-  color: var(--faint);
-  background: var(--sidebar);
-}
 /* 同一仓库的工作区常驻左侧，右侧保持源码与分支各自的浏览位置。 */
 .repository-workbench {
   display: grid;
@@ -1797,13 +1819,6 @@ button {
 .source-status {
   color: var(--modified);
 }
-.statusbar,
-.readonly-label {
-  color: var(--muted);
-}
-.readonly-label {
-  opacity: 1;
-}
 .code-row.add {
   background: var(--add-bg);
   color: var(--add-fg);
@@ -1819,9 +1834,6 @@ button {
 .split-side:first-child .split-label {
   color: var(--muted);
 }
-.status-dot {
-  background: var(--added);
-}
 .theme-dropdown > span {
   font-size: 12px;
 }
@@ -1835,8 +1847,7 @@ body {
 .toolbar,
 .persistent-sidebar,
 .repository-main,
-.changes-editor,
-.statusbar {
+.changes-editor {
   transition:
     background-color var(--fast),
     color var(--fast);

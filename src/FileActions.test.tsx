@@ -400,9 +400,7 @@ it("提交树显示作者，复制标题与完整 ID 不选择提交", async () 
   );
   expect(writeText).toHaveBeenCalledWith(`${commit.subject}\n${commit.hash}`);
   expect(onSelect).not.toHaveBeenCalled();
-  await act(async () =>
-    fireEvent.click(screen.getByRole("button", { name: "复制分支名称：main" })),
-  );
-  expect(writeText).toHaveBeenLastCalledWith("main");
-  expect(onSelect).not.toHaveBeenCalled();
+  expect(
+    screen.queryByRole("button", { name: "复制分支名称：main" }),
+  ).toBeNull();
 });

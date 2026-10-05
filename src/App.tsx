@@ -7,11 +7,11 @@ import { HistoryGraph } from "./HistoryGraph";
 import { Details, type DetailState } from "./Details";
 import { usePaneLayout } from "./usePaneLayout";
 import { Icon } from "./Icon";
-import { CopyButton } from "./CopyButton";
 import { Dropdown, type MenuOption } from "./Dropdown";
 import type { Selection } from "./types";
 import { useTheme, THEMES, type Theme } from "./theme";
 import { ReadStatus } from "./ReadStatus";
+import { SyncIndicator } from "./SyncIndicator";
 export default function App() {
   const repo = useRepository();
   const { theme, setTheme } = useTheme();
@@ -37,6 +37,8 @@ export default function App() {
     } | null>(null),
     locateFrame = useRef(0);
   const s = repo.project?.snapshot;
+  const readError = repo.error;
+  const syncing = repo.syncing;
   const graphSnapshot = repo.history.snapshot ?? s;
   const viewRef = useRef(view),
     repoIdRef = useRef(repo.project?.repoId),
@@ -264,9 +266,6 @@ export default function App() {
               <Icon name="branch" size={16} />
               {s.branch || "分离 HEAD"}
             </span>
-            {s.branch && (
-              <CopyButton text={s.branch} label="复制当前分支名称" />
-            )}
             <span className="toolbar-spacer" data-tauri-drag-region />
             {s.worktrees.length > 1 && (
               <Dropdown
@@ -293,7 +292,7 @@ export default function App() {
               <Icon name="target" />
             </button>
             <button
-              className={"icon-button " + (repo.refreshing ? "refreshing" : "")}
+              className="icon-button"
               onClick={() => void repo.refresh(true)}
               title="刷新 · ⌘ / Ctrl R"
               aria-label="刷新仓库"
@@ -311,21 +310,17 @@ export default function App() {
           label="切换主题"
           icon="palette"
         />
+        <SyncIndicator busy={syncing} requestKey={repo.project?.repoId ?? ""} />
       </header>
-      {repo.error && (
+      {readError && (
         <div className="error-banner" role="status">
           <span>
-            {repo.error.message}
+            {readError.message}
             {s && " 当前保留上次读取的结果。"}
           </span>
           <button onClick={repo.retryError}>重试</button>
         </div>
       )}
-      <ReadStatus
-        busy={repo.opening}
-        requestKey="open-project"
-        label="正在打开项目…"
-      />
       {!repo.project ? (
         <main className="welcome">
           <div className="welcome-mark">
@@ -638,29 +633,6 @@ export default function App() {
           </section>
         </main>
       )}
-      <footer className="statusbar">
-        <span className={"status-dot " + (repo.error ? "error" : "")} />
-        <span>
-          {repo.error
-            ? "读取失败"
-            : repo.opening
-              ? "正在打开"
-              : repo.refreshing
-                ? "正在检查"
-                : s
-                  ? "实时观察"
-                  : "只读 Git 查看工具"}
-        </span>
-        <span className="toolbar-spacer" />
-        {s && (s.ahead > 0 || s.behind > 0) && (
-          <span title={"基于本地已有的 " + s.upstream + " 记录"}>
-            {s.ahead > 0 ? "领先 " + s.ahead + " 个提交" : ""}
-            {s.ahead > 0 && s.behind > 0 ? " · " : ""}
-            {s.behind > 0 ? "落后 " + s.behind + " 个提交" : ""}
-          </span>
-        )}
-        <span className="readonly-label">只读</span>
-      </footer>
     </div>
   );
 }
