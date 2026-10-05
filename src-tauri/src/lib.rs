@@ -65,22 +65,140 @@ fn parse_launch(args: &[String]) -> Result<Option<LaunchRequest>> {
         view: view.into(),
     }))
 }
-fn installed_skill_path() -> PathBuf {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CliLanguage {
+    English,
+    Chinese,
+}
+fn system_language() -> CliLanguage {
+    ["LC_ALL", "LC_MESSAGES", "LANG"]
+        .iter()
+        .filter_map(|key| std::env::var(key).ok())
+        .find(|value| !value.is_empty())
+        .map(|value| {
+            if value.to_ascii_lowercase().starts_with("zh") {
+                CliLanguage::Chinese
+            } else {
+                CliLanguage::English
+            }
+        })
+        .unwrap_or(CliLanguage::English)
+}
+fn take_cli_language(args: &[String]) -> (Vec<String>, CliLanguage, bool) {
+    let mut rest = Vec::with_capacity(args.len());
+    let mut language = system_language();
+    let mut valid = true;
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] == "--lang" {
+            match args.get(index + 1).map(String::as_str) {
+                Some("en") => language = CliLanguage::English,
+                Some("zh-CN") => language = CliLanguage::Chinese,
+                _ => valid = false,
+            }
+            index = (index + 2).min(args.len());
+        } else {
+            rest.push(args[index].clone());
+            index += 1;
+        }
+    }
+    (rest, language, valid)
+}
+fn cli_error(error: &Error, language: CliLanguage) -> String {
+    if language == CliLanguage::Chinese {
+        return error.message.clone();
+    }
+    match error.message_key.as_str() {
+        "arguments" => "Invalid command arguments. Run `oil-git --help` for usage.".into(),
+        "bare" => "Bare repositories are not supported. Open a Git project with a working tree.".into(),
+        "binary" => "Line attribution is unavailable for this file.".into(),
+        "changed" => "The file changed while it was being read. Try again.".into(),
+        "changing" => "Git is changing. The repository will be read again shortly.".into(),
+        "config" => "Could not read application configuration.".into(),
+        "conflict" => "Line attribution is unavailable while this file has unresolved conflicts.".into(),
+        "git" => "Git could not read the requested data.".into(),
+        "gitMissing" => "Git was not found. Install Git, then check again.".into(),
+        "gitUnavailable" => "Could not start Git. Check the Git installation and try again.".into(),
+        "invalid" => "The Git read request is invalid.".into(),
+        "io" => "The file system read failed.".into(),
+        "lfsHelper" => "Could not safely locate the Git LFS helper.".into(),
+        "missing" => "The project directory does not exist or cannot be accessed.".into(),
+        "missingReference" => "The branch or tag has been removed.".into(),
+        "notRepository" => "This folder is not a Git repository. Initialize it, then open it again.".into(),
+        "open" => "Could not open the requested link.".into(),
+        "partialCloneUnsupported" => "Partial clones are not supported in read-only mode because Git may download missing objects on demand.".into(),
+        "path" => "The project path is invalid.".into(),
+        "process" => "The Git process failed. Try again.".into(),
+        "read" => "The read failed. Try again.".into(),
+        "recent" => "Could not read recent project records.".into(),
+        "session" => "The project session is closed. Open the project again.".into(),
+        "staleHistory" => "Commit history changed while reading. Reload and try again.".into(),
+        "symlink" => "Symbolic link contents are not read as regular text files.".into(),
+        "timeout" => "The Git read timed out. Try again.".into(),
+        "tooLarge" => "The Git result is too large to read completely.".into(),
+        "unsafeFilter" => "This Git content filter is unsupported and cannot be read safely.".into(),
+        "unsafePath" => "A repository path is outside the safe read boundary.".into(),
+        "unsupportedLfsExtension" => "Git LFS pointer extensions are not supported.".into(),
+        "lfsAttributeSourceUnsupported" => "Git could not read historical LFS attributes. The raw diff is still available.".into(),
+        "watch" => "Could not watch for repository changes.".into(),
+        _ => error.message.clone(),
+    }
+}
+fn cli_error_payload(error: &Error, language: CliLanguage) -> serde_json::Value {
+    serde_json::json!({
+        "status": "error",
+        "kind": error.kind,
+        "messageKey": error.message_key,
+        "message": cli_error(error, language),
+        "diagnostic": error.message,
+    })
+}
+fn invalid_language_message(language: CliLanguage) -> &'static str {
+    if language == CliLanguage::Chinese {
+        "--lang 仅支持 en 或 zh-CN。"
+    } else {
+        "--lang supports only en or zh-CN."
+    }
+}
+fn invalid_language_payload(language: CliLanguage) -> serde_json::Value {
+    let message = invalid_language_message(language);
+    serde_json::json!({
+        "status": "error",
+        "kind": "arguments",
+        "messageKey": "arguments",
+        "message": message,
+        "diagnostic": "--lang supports only en or zh-CN.",
+    })
+}
+fn installed_skill_path(language: CliLanguage) -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         #[cfg(target_os = "macos")]
-        let resource = exe
-            .parent()
-            .and_then(|p| p.parent())
-            .map(|p| p.join("Resources/skills/oil-git/SKILL.md"));
+        let resource = exe.parent().and_then(|p| p.parent()).map(|p| {
+            p.join(if language == CliLanguage::Chinese {
+                "Resources/skills/oil-git/SKILL.zh-CN.md"
+            } else {
+                "Resources/skills/oil-git/SKILL.md"
+            })
+        });
         #[cfg(not(target_os = "macos"))]
-        let resource = exe.parent().map(|p| p.join("skills/oil-git/SKILL.md"));
+        let resource = exe.parent().map(|p| {
+            p.join(if language == CliLanguage::Chinese {
+                "skills/oil-git/SKILL.zh-CN.md"
+            } else {
+                "skills/oil-git/SKILL.md"
+            })
+        });
         if let Some(path) = resource {
             if path.is_file() {
                 return path;
             }
         }
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../skills/oil-git/SKILL.md")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(if language == CliLanguage::Chinese {
+        "../skills/oil-git/SKILL.zh-CN.md"
+    } else {
+        "../skills/oil-git/SKILL.md"
+    })
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Recent {
@@ -414,9 +532,12 @@ fn open_git_install(app: tauri::AppHandle) -> Result<()> {
         .map_err(|e| Error::new("open", e.to_string()))
 }
 pub fn run() {
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    if args.first().is_some_and(|arg| arg == lfs::CLEAN_COMMAND) {
-        let status = if args.len() == 1 {
+    let raw_args: Vec<_> = std::env::args().skip(1).collect();
+    if raw_args
+        .first()
+        .is_some_and(|arg| arg == lfs::CLEAN_COMMAND)
+    {
+        let status = if raw_args.len() == 1 {
             lfs::run_clean()
         } else {
             eprintln!("oil-git: invalid hidden LFS clean arguments");
@@ -424,11 +545,11 @@ pub fn run() {
         };
         std::process::exit(status);
     }
-    if args
+    if raw_args
         .first()
         .is_some_and(|arg| arg == lfs::FILTER_PROCESS_COMMAND)
     {
-        let status = if args.len() == 1 {
+        let status = if raw_args.len() == 1 {
             lfs::run_filter_process()
         } else {
             eprintln!("oil-git: invalid hidden LFS filter-process arguments");
@@ -436,8 +557,21 @@ pub fn run() {
         };
         std::process::exit(status);
     }
+    let (args, language, valid_language) = take_cli_language(&raw_args);
+    if !valid_language {
+        if args.first().is_some_and(|arg| arg == "inspect") {
+            println!("{}", invalid_language_payload(language));
+        } else {
+            eprintln!("{}", invalid_language_message(language));
+        }
+        std::process::exit(2);
+    }
     if args.first().is_some_and(|a| a == "--help" || a == "-h") {
-        println!("oil-git 只读 Git 查看工具\n打开：oil-git open <项目路径> [--view changes|history]\n读取：oil-git inspect <项目路径> --json\nSkill：oil-git skill [--path]\n无参数启动桌面界面。");
+        if language == CliLanguage::Chinese {
+            println!("oil-git 只读 Git 查看工具\n\n用法：\n打开：oil-git open <项目路径> [--view changes|history]\n读取：oil-git inspect <项目路径> --json\nSkill：oil-git skill [--path]\n语言：oil-git --lang en|zh-CN <命令>\n无参数启动桌面界面。");
+        } else {
+            println!("oil-git read-only Git viewer\n\nUsage:\nOpen: oil-git open <project-path> [--view changes|history]\nInspect: oil-git inspect <project-path> --json\nSkill: oil-git skill [--path]\nLanguage: oil-git --lang en|zh-CN <command>\nRun without arguments to launch the desktop app.");
+        }
         return;
     }
     if args.first().is_some_and(|a| a == "--version") {
@@ -446,11 +580,19 @@ pub fn run() {
     }
     if args.first().is_some_and(|a| a == "skill") {
         if args.len() == 1 {
-            print!("{}", include_str!("../../skills/oil-git/SKILL.md"));
+            if language == CliLanguage::Chinese {
+                print!("{}", include_str!("../../skills/oil-git/SKILL.zh-CN.md"));
+            } else {
+                print!("{}", include_str!("../../skills/oil-git/SKILL.md"));
+            }
         } else if args.len() == 2 && args[1] == "--path" {
-            println!("{}", installed_skill_path().display());
+            println!("{}", installed_skill_path(language).display());
         } else {
-            eprintln!("用法：oil-git skill [--path]");
+            if language == CliLanguage::Chinese {
+                eprintln!("用法：oil-git skill [--path]");
+            } else {
+                eprintln!("Usage: oil-git skill [--path]");
+            }
             std::process::exit(2);
         }
         return;
@@ -470,10 +612,7 @@ pub fn run() {
         match result {
             Ok(data) => println!("{}", serde_json::json!({"status":"ready","data":data})),
             Err(error) => {
-                println!(
-                    "{}",
-                    serde_json::json!({"status":"error","kind":error.kind,"message":error.message})
-                );
+                println!("{}", cli_error_payload(&error, language));
                 std::process::exit(2);
             }
         }
@@ -482,7 +621,7 @@ pub fn run() {
     let launch = match parse_launch(&args) {
         Ok(request) => request,
         Err(error) => {
-            eprintln!("{}", error.message);
+            eprintln!("{}", cli_error(&error, language));
             std::process::exit(2);
         }
     };
@@ -493,7 +632,8 @@ pub fn run() {
     tauri::Builder::default()
         .manage(state)
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
-            let parsed: Vec<_> = args.into_iter().skip(1).collect();
+            let raw: Vec<_> = args.into_iter().skip(1).collect();
+            let (parsed, _, language_valid) = take_cli_language(&raw);
             // 第二个进程的相对路径由它自己的工作目录解释。
             let parsed = if parsed.first().is_some_and(|a| a == "open") && parsed.len() > 1 {
                 let mut p = parsed;
@@ -505,9 +645,11 @@ pub fn run() {
             } else {
                 parsed
             };
-            if let Ok(Some(request)) = parse_launch(&parsed) {
-                *app.state::<AppState>().launch.lock().unwrap() = Some(request.clone());
-                let _ = app.emit("open-request", request);
+            if language_valid {
+                if let Ok(Some(request)) = parse_launch(&parsed) {
+                    *app.state::<AppState>().launch.lock().unwrap() = Some(request.clone());
+                    let _ = app.emit("open-request", request);
+                }
             }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -617,6 +759,82 @@ mod cli_tests {
         assert!(parse_launch(&["commit".into(), ".".into()]).is_err());
         assert!(
             parse_launch(&["open".into(), ".".into(), "--view".into(), "unknown".into()]).is_err()
+        );
+    }
+
+    #[test]
+    fn language_flag_can_appear_before_or_after_cli_command() {
+        let (args, language, valid) = take_cli_language(&[
+            "--lang".into(),
+            "en".into(),
+            "inspect".into(),
+            "/repo".into(),
+            "--json".into(),
+        ]);
+        assert!(valid);
+        assert_eq!(language, CliLanguage::English);
+        assert_eq!(args, ["inspect", "/repo", "--json"]);
+
+        let (args, language, valid) = take_cli_language(&[
+            "inspect".into(),
+            "/repo".into(),
+            "--json".into(),
+            "--lang".into(),
+            "zh-CN".into(),
+        ]);
+        assert!(valid);
+        assert_eq!(language, CliLanguage::Chinese);
+        assert_eq!(args, ["inspect", "/repo", "--json"]);
+    }
+
+    #[test]
+    fn invalid_language_on_inspect_keeps_the_json_error_contract() {
+        let (args, language, valid) = take_cli_language(&[
+            "inspect".into(),
+            "/repo".into(),
+            "--json".into(),
+            "--lang".into(),
+            "fr".into(),
+        ]);
+        assert!(!valid);
+        assert_eq!(args, ["inspect", "/repo", "--json"]);
+        let payload = invalid_language_payload(language);
+        assert_eq!(payload["status"], "error");
+        assert_eq!(payload["kind"], "arguments");
+        assert_eq!(payload["messageKey"], "arguments");
+        assert!(payload["message"].as_str().unwrap().contains("--lang"));
+        assert_eq!(payload["diagnostic"], "--lang supports only en or zh-CN.");
+
+        let english_payload = invalid_language_payload(CliLanguage::English);
+        let chinese_payload = invalid_language_payload(CliLanguage::Chinese);
+        assert_eq!(
+            english_payload["diagnostic"], chinese_payload["diagnostic"],
+            "the diagnostic is stable across locales"
+        );
+        assert_ne!(english_payload["message"], chinese_payload["message"]);
+
+        let (_, _, valid) = take_cli_language(&[
+            "inspect".into(),
+            "/repo".into(),
+            "--json".into(),
+            "--lang".into(),
+        ]);
+        assert!(!valid);
+    }
+
+    #[test]
+    fn inspect_error_payload_keeps_the_raw_diagnostic() {
+        let error = Error::new(
+            "unsafeFilter",
+            "filter.demo.clean may modify repository files",
+        );
+        let payload = cli_error_payload(&error, CliLanguage::English);
+        assert_eq!(payload["kind"], "unsafeFilter");
+        assert_eq!(payload["messageKey"], "unsafeFilter");
+        assert!(payload["message"].as_str().unwrap().contains("unsupported"));
+        assert_eq!(
+            payload["diagnostic"],
+            "filter.demo.clean may modify repository files"
         );
     }
 

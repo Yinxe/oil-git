@@ -2,7 +2,7 @@
 name = "oil-git"
 version = "0.1.0"
 edition = "2021"
-description = "只读 Git 可视化桌面工具"
+description = "A read-only Git desktop viewer"
 license = "MIT"
 repository = "https://github.com/oil-oil/oil-git"
 

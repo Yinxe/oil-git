@@ -9,12 +9,15 @@ import { usePaneLayout } from "./usePaneLayout";
 import { Icon } from "./Icon";
 import { Dropdown, type MenuOption } from "./Dropdown";
 import type { Selection } from "./types";
-import { useTheme, THEMES, type Theme } from "./theme";
+import { useTheme, type Theme } from "./theme";
 import { ReadStatus } from "./ReadStatus";
 import { SyncIndicator } from "./SyncIndicator";
+import { useI18n } from "./i18n";
+import { ErrorMessage } from "./ErrorMessage";
 export default function App() {
   const repo = useRepository();
   const { theme, setTheme } = useTheme();
+  const { language, setLanguage, t } = useI18n();
   const [view, setView] = useState<"source" | "history">("history");
   const working = useWorkingCopy(repo.project, view === "source");
   const [selection, setSelection] = useState<Selection>(null);
@@ -208,27 +211,36 @@ export default function App() {
     }
   };
   const conflicts = s?.files.filter((f) => f.conflict).length ?? 0;
+  const themes = [
+    { value: "dark", label: t("深色") },
+    { value: "light", label: t("浅色") },
+    { value: "green", label: t("绿色") },
+  ];
+  const languages = [
+    { value: "en", label: t("英文") },
+    { value: "zh-CN", label: t("简体中文") },
+  ];
   const filters: MenuOption[] = [
-    { value: "all", label: "所有分支与标签" },
-    { value: "HEAD", label: "当前 HEAD 的历史" },
+    { value: "all", label: t("所有分支与标签") },
+    { value: "HEAD", label: t("当前 HEAD 的历史") },
     ...(s?.refs ?? []).map((r) => ({
       value: r.fullName,
       label: r.name,
       group:
         r.kind === "branch"
-          ? "本地分支"
+          ? t("本地分支")
           : r.kind === "remote"
-            ? "远程分支"
-            : "标签",
+            ? t("远程分支")
+            : t("标签"),
     })),
   ];
   const recentOptions: MenuOption[] = [
-    { value: "__choose", label: "打开其他项目", description: "⌘ / Ctrl O" },
+    { value: "__choose", label: t("打开其他项目"), description: "⌘ / Ctrl O" },
     ...repo.recents.map((r) => ({
       value: r.path,
       label: r.name,
       description: r.path,
-      group: "最近打开",
+      group: t("最近打开"),
       removable: true,
     })),
   ];
@@ -253,18 +265,22 @@ export default function App() {
             v === "__choose" ? void repo.choose() : void repo.openPath(v);
           }}
           onRemoveOption={repo.forgetRecent}
-          message={repo.recentError?.message}
+          message={
+            repo.recentError ? (
+              <ErrorMessage error={repo.recentError} />
+            ) : undefined
+          }
           busy={repo.forgettingRecent}
-          label={s?.name || "打开项目"}
+          label={s?.name || t("打开项目")}
           icon="folder"
           disabled={!repo.gitStatus.version}
         />
         {s && (
           <>
             <span className="toolbar-divider" />
-            <span className="current-branch" title={s.branch || "分离 HEAD"}>
+            <span className="current-branch" title={s.branch || t("分离 HEAD")}>
               <Icon name="branch" size={16} />
-              {s.branch || "分离 HEAD"}
+              {s.branch || t("分离 HEAD")}
             </span>
             <span className="toolbar-spacer" data-tauri-drag-region />
             {s.worktrees.length > 1 && (
@@ -273,12 +289,12 @@ export default function App() {
                 value={s.path}
                 options={s.worktrees.map((w) => ({
                   value: w.path,
-                  label: w.branch || "工作树",
+                  label: w.detached ? t("分离 HEAD") : w.branch || t("工作树"),
                   description: w.path,
                   disabled: !w.available || w.bare,
                 }))}
                 onChange={(v) => void repo.openPath(v)}
-                label="观察工作树"
+                label={t("观察工作树")}
                 icon="stack"
               />
             )}
@@ -286,16 +302,16 @@ export default function App() {
               className="icon-button"
               onClick={locateHead}
               disabled={!s.head}
-              aria-label="返回 HEAD"
-              title="返回 HEAD"
+              aria-label={t("返回 HEAD")}
+              title={t("返回 HEAD")}
             >
               <Icon name="target" />
             </button>
             <button
               className="icon-button"
               onClick={() => void repo.refresh(true)}
-              title="刷新 · ⌘ / Ctrl R"
-              aria-label="刷新仓库"
+              title={t("刷新 · ⌘ / Ctrl R")}
+              aria-label={t("刷新仓库")}
             >
               <Icon name="refresh" />
             </button>
@@ -305,20 +321,28 @@ export default function App() {
         <Dropdown
           className="theme-dropdown"
           value={theme}
-          options={THEMES}
+          options={themes}
           onChange={(v) => setTheme(v as Theme)}
-          label="切换主题"
+          label={t("切换主题")}
           icon="palette"
+        />
+        <Dropdown
+          className="language-dropdown"
+          value={language}
+          options={languages}
+          onChange={(value) => setLanguage(value as "en" | "zh-CN")}
+          label={t("切换语言")}
+          icon="language"
         />
         <SyncIndicator busy={syncing} requestKey={repo.project?.repoId ?? ""} />
       </header>
       {readError && (
         <div className="error-banner" role="status">
-          <span>
-            {readError.message}
-            {s && " 当前保留上次读取的结果。"}
-          </span>
-          <button onClick={repo.retryError}>重试</button>
+          <div>
+            <ErrorMessage error={readError} />
+            {s && " " + t("当前保留上次读取的结果。")}
+          </div>
+          <button onClick={repo.retryError}>{t("重试")}</button>
         </div>
       )}
       {!repo.project ? (
@@ -328,11 +352,13 @@ export default function App() {
           </div>
           <h1>oil-git</h1>
           <p>
-            {repo.gitStatus.error?.message ||
-              "打开本地项目，查看分支、提交和文件变化。"}
+            {(repo.gitStatus.error && (
+              <ErrorMessage error={repo.gitStatus.error} />
+            )) ||
+              t("打开本地项目，查看分支、提交和文件变化。")}
           </p>
           {repo.gitStatus.loading ? (
-            <span className="subtle">正在检测 Git…</span>
+            <span className="subtle">{t("正在检测 Git…")}</span>
           ) : repo.gitStatus.error ? (
             <div className="welcome-actions">
               {repo.gitStatus.error.kind === "gitMissing" && (
@@ -340,10 +366,12 @@ export default function App() {
                   className="primary"
                   onClick={() => void request("open_git_install")}
                 >
-                  查看安装方式
+                  {t("查看安装方式")}
                 </button>
               )}
-              <button onClick={() => void repo.checkGit()}>重新检测</button>
+              <button onClick={() => void repo.checkGit()}>
+                {t("重新检测")}
+              </button>
             </div>
           ) : (
             <>
@@ -353,13 +381,13 @@ export default function App() {
                 disabled={repo.opening}
               >
                 <Icon name="folder" />
-                打开 Git 项目
+                {t("打开 Git 项目")}
               </button>
               {repo.recents.length > 0 && (
                 <div className="welcome-recents">
                   {repo.recentError && (
                     <div className="welcome-recent-error" role="status">
-                      {repo.recentError.message}
+                      <ErrorMessage error={repo.recentError} />
                     </div>
                   )}
                   {repo.recents.slice(0, 4).map((r) => (
@@ -371,13 +399,15 @@ export default function App() {
                         onClick={() => void repo.openPath(r.path)}
                       >
                         <strong>{r.name}</strong>
-                        <span>打开 →</span>
+                        <span>{t("打开 →")}</span>
                       </button>
                       <button
                         type="button"
                         className="welcome-recent-remove"
-                        aria-label={`从最近打开移除 ${r.name}`}
-                        title="从最近打开移除"
+                        aria-label={t("从最近打开移除 {name}", {
+                          name: r.name,
+                        })}
+                        title={t("从最近打开移除")}
                         disabled={repo.forgettingRecent}
                         onClick={() => void repo.forgetRecent(r.path)}
                       >
@@ -392,10 +422,12 @@ export default function App() {
         </main>
       ) : (
         <main className="repository-workbench" data-view={view}>
-          <aside className="persistent-sidebar" aria-label="当前工作区">
+          <aside className="persistent-sidebar" aria-label={t("当前工作区")}>
             <header className="sidebar-heading">
-              <h1>源代码管理</h1>
-              <span title="发生变化的文件数量">{s!.files.length} 个文件</span>
+              <h1>{t("源代码管理")}</h1>
+              <span title={t("发生变化的文件数量")}>
+                {t("{count} 个文件", { count: s!.files.length })}
+              </span>
             </header>
             {s!.operation && (
               <div
@@ -403,8 +435,10 @@ export default function App() {
                   "operation-status " + (conflicts ? "conflict-text" : "")
                 }
               >
-                {s!.operation}
-                {conflicts ? "暂停 · " + conflicts + " 个冲突文件" : "进行中"}
+                {t(s!.operation)}
+                {conflicts
+                  ? t("暂停 · {count} 个冲突文件", { count: conflicts })
+                  : t("进行中")}
               </div>
             )}
             <ChangesSidebar
@@ -420,17 +454,17 @@ export default function App() {
           <div
             className="resize-handle sidebar-resize-handle"
             role="separator"
-            aria-label="调整侧栏宽度"
+            aria-label={t("调整侧栏宽度")}
             aria-orientation="vertical"
             tabIndex={0}
             {...panes.handle("sidebar")}
           />
-          <section className="repository-main" aria-label="仓库内容">
+          <section className="repository-main" aria-label={t("仓库内容")}>
             <header className="viewbar">
               <div
                 className="view-tabs"
                 role="tablist"
-                aria-label="仓库视图"
+                aria-label={t("仓库视图")}
                 data-view={view}
               >
                 <i aria-hidden="true" />
@@ -448,7 +482,7 @@ export default function App() {
                   }}
                 >
                   <Icon name="changes" size={15} />
-                  源码
+                  {t("源码")}
                 </button>
                 <button
                   role="tab"
@@ -464,7 +498,7 @@ export default function App() {
                   }}
                 >
                   <Icon name="branch" size={15} />
-                  分支
+                  {t("分支")}
                 </button>
               </div>
               <span className="toolbar-spacer" />
@@ -473,7 +507,7 @@ export default function App() {
                   value={repo.reference}
                   options={filters}
                   onChange={selectHistoryFilter}
-                  label="筛选提交历史"
+                  label={t("筛选提交历史")}
                   searchable
                   icon="filter"
                 />
@@ -515,7 +549,7 @@ export default function App() {
               inert={view !== "history"}
             >
               <div className="workspace" data-expanded={detailOpen}>
-                <section className="history-panel" aria-label="仓库历史">
+                <section className="history-panel" aria-label={t("仓库历史")}>
                   <div className="detail-pending">
                     <ReadStatus
                       busy={
@@ -527,21 +561,24 @@ export default function App() {
                       requestKey={detailOwner}
                       label={
                         selectedSubject
-                          ? "正在读取：" + selectedSubject
-                          : "正在读取提交…"
+                          ? t("正在读取：{subject}", {
+                              subject: selectedSubject,
+                            })
+                          : t("正在读取提交…")
                       }
                     />
                   </div>
                   {repo.history.error && (
                     <div className="history-error" role="status">
-                      {repo.history.error.message} 当前保留上次加载的历史。
-                      <button onClick={repo.retryHistory}>重试</button>
+                      <ErrorMessage error={repo.history.error} />{" "}
+                      {t("当前保留上次加载的历史。")}
+                      <button onClick={repo.retryHistory}>{t("重试")}</button>
                     </div>
                   )}
                   <ReadStatus
                     busy={repo.history.loading}
                     requestKey={repo.project.repoId + repo.reference}
-                    label="正在读取提交历史…"
+                    label={t("正在读取提交历史…")}
                   />
                   {repo.history.commits.length ? (
                     <HistoryGraph
@@ -562,9 +599,13 @@ export default function App() {
                   ) : !repo.history.loading && !repo.history.error ? (
                     <div className="history-empty">
                       <Icon name="branch" size={28} />
-                      <p>{s!.head ? "当前筛选没有提交。" : "还没有提交。"}</p>
+                      <p>
+                        {s!.head ? t("当前筛选没有提交。") : t("还没有提交。")}
+                      </p>
                       {!s!.head && (
-                        <span>在编辑器或终端中提交后，这里会自动更新。</span>
+                        <span>
+                          {t("在编辑器或终端中提交后，这里会自动更新。")}
+                        </span>
                       )}
                     </div>
                   ) : (
@@ -574,13 +615,15 @@ export default function App() {
                     <span>
                       {repo.history.commits.length > 0 &&
                         (repo.history.hasMore || repo.history.loading) &&
-                        "已加载 " + repo.history.commits.length + " 个提交"}
+                        t("已加载 {count} 个提交", {
+                          count: repo.history.commits.length,
+                        })}
                     </span>
                     {repo.history.hasMore && (
                       <button
                         onClick={repo.more}
-                        aria-label="加载更多提交"
-                        title="加载更多提交"
+                        aria-label={t("加载更多提交")}
+                        title={t("加载更多提交")}
                         disabled={
                           repo.history.loading ||
                           !!repo.history.error ||
@@ -593,7 +636,7 @@ export default function App() {
                     {s!.stashes.length > 0 && (
                       <button onClick={() => pick({ kind: "stashes" })}>
                         <Icon name="stack" size={14} />
-                        临时保存
+                        {t("临时保存")}
                         <span className="count-bubble">
                           {s!.stashes.length}
                         </span>
@@ -604,7 +647,7 @@ export default function App() {
                 <div
                   className="resize-handle"
                   role="separator"
-                  aria-label="调整详情宽度"
+                  aria-label={t("调整详情宽度")}
                   aria-orientation="vertical"
                   tabIndex={detailOpen ? 0 : -1}
                   {...panes.handle("detail")}

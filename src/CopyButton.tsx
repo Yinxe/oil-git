@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Icon } from "./Icon";
+import { useI18n } from "./i18n";
 
 export function CopyButton({
   text,
@@ -12,6 +13,7 @@ export function CopyButton({
   quiet?: boolean;
 }) {
   const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
+  const { t } = useI18n();
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const serial = useRef(0);
   useEffect(() => {
@@ -24,9 +26,9 @@ export function CopyButton({
   }, [text]);
   const title =
     status === "copied"
-      ? "已复制"
+      ? t("已复制")
       : status === "error"
-        ? "复制失败，点击重试"
+        ? t("复制失败，点击重试")
         : label;
   return (
     <button

@@ -1,91 +1,83 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="oil-git：只读的 Git 可视化桌面工具，看清 AI 改了什么。支持 macOS 与 Windows。">
+  <img src="./assets/readme/hero-en.svg" width="100%" alt="oil-git is a read-only desktop Git viewer that helps you see what changed." />
 </p>
 
 <p align="center">
-  <a href="https://github.com/oil-oil/oil-git/actions/workflows/build.yml"><img src="https://github.com/oil-oil/oil-git/actions/workflows/build.yml/badge.svg" alt="Mac 与 Windows 的桌面测试和打包状态"></a>
+  <a href="https://github.com/oil-oil/oil-git/actions/workflows/build.yml"><img src="https://github.com/oil-oil/oil-git/actions/workflows/build.yml/badge.svg" alt="Desktop build and test status" /></a>
   · <a href="LICENSE">MIT</a>
-  · <a href="#下载与开始">下载测试版</a>
-  · <a href="docs/usage.md">使用说明</a>
+  · <a href="https://github.com/oil-oil/oil-git/releases">Downloads</a>
+  · <a href="docs/usage.md">Usage</a>
+  · <a href="CONTRIBUTING.md">Contributing</a>
   · <a href="skills/oil-git/SKILL.md">Agent Skill</a>
+  · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-**oil-git 是一个只读的 Git 可视化桌面工具。** 打开自己的项目，就能看清当前分支、Agent 改了哪些文件，以及提交之间的关系。你继续在终端或 Agent 中操作 Git，窗口会跟着真实仓库的变化更新。
+**oil-git is a read-only desktop viewer for local Git repositories.** Open a project to inspect its current branch, working tree changes, commit history, and file diffs. Keep using Git in your editor, terminal, or agent; oil-git follows changes made to the real repository.
 
-## 看效果
+## What you can inspect
+
+| Question                      | oil-git shows                                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Which branch am I on?         | The commit graph, parent relationships, local branches, tags, and `HEAD`                                 |
+| What changed in this project? | Files grouped by merge conflicts, staged changes, and working tree changes                               |
+| What does a commit contain?   | Its changed files, diff, author, date, and parent commits                                                |
+| How did a file change?        | Side-by-side or unified text diffs with original line numbers; image comparison; media and byte previews |
+| What is the repository state? | Worktrees, stashes, merge or rebase state, and locally recorded upstream counts                          |
+
+## Screenshot
 
 <p align="center">
-  <a href="./assets/readme/app-dark.webp"><img src="./assets/readme/app-dark.webp" width="100%" alt="oil-git 的 Mac 原生窗口：左侧区分暂存和工作区变化，中间展示真实提交图，右侧查看所选提交的文件与代码差异。"></a>
+  <img src="./assets/readme/app-en.jpg" width="100%" alt="oil-git showing a local Git repository in English." />
 </p>
 
-上图来自实际安装的 Mac 测试包与真实验收仓库。顶部 SVG 是同一仓库数据的简化示意；点击窗口截图可查看原图。
+Repository names, branches, commit messages, paths, and author details remain exactly as Git records them when the interface language changes.
 
-## 能看清什么
+The workspace sidebar stays visible while the right pane switches between changes and history. Choose a branch or tag to filter history; this only changes what is shown and never checks out a branch. Choose a worktree to observe it in the same way.
 
-| 你想确认             | oil-git 展示什么                                                    |
-| -------------------- | ------------------------------------------------------------------- |
-| 现在在哪个分支       | 提交图、父子关系、分支、标签与 HEAD；筛选后可返回 HEAD              |
-| Agent 改了哪些文件   | 左侧按目录分类，区分已暂存、未暂存、未跟踪与冲突                    |
-| 这次提交具体改了什么 | 点击节点查看文件与差异；提交信息按需展开                            |
-| 修改前后有什么区别   | 左右对照或统一差异，默认自动换行，保留真实行号                      |
-| 还有哪些仓库状态     | 工作树、stash、合并与 rebase 状态；CLI 快照可读取本地记录的远程领先／落后数量 |
+The interface supports English and Simplified Chinese. It follows the system language on first launch, then remembers the language you choose. Dark, light, and green themes are available as well.
 
-左侧文件列表常驻，右侧切换源码与分支。支持浅色、深色和绿色主题，各栏宽度可拖动调整，偏好保存在本机。
+## Install
 
-## 下载与开始
+GitHub Releases currently contain an earlier test build and may not include the bilingual interface and CLI updates in this branch. To try the current changes, use the matching [GitHub Actions build artifact](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) or [build from source](docs/development.md). Git must be installed on the computer. The packaged app does not require Python, Node.js, or Rust at runtime.
 
-当前提供 **0.1.0 测试版**。
+Open a project from the toolbar or press **⌘ O** on macOS or **Ctrl O** on Windows. Selecting a directory inside a repository opens its owning repository. Use **⌘ R** or **Ctrl R** to refresh.
 
-1. 下载对应平台的安装包：
-   - **macOS Apple Silicon / Intel**：[通用 DMG](https://github.com/oil-oil/oil-git/releases/download/v0.1.0-test.1/oil-git_0.1.0_universal.dmg)。打开后将 oil-git 拖入 Applications。
-   - **Windows x64**：[安装程序](https://github.com/oil-oil/oil-git/releases/download/v0.1.0-test.1/oil-git_0.1.0_x64-setup.exe)。运行后按提示完成安装。
-2. 电脑需要已有 **Git**。应用启动时会检测；缺失时会提供安装入口和重新检测。运行应用无需 Python、Node 或 Rust。Windows 缺少 WebView2 时，安装器会下载微软运行组件。
-3. 打开项目，或按 **⌘ O / Ctrl O**。选择项目子目录也能识别所属仓库。
-4. 点击左侧文件查看差异，或在“分支”中点击提交节点查看详情。
+## Agent and CLI
 
-[版本说明与校验摘要](https://github.com/oil-oil/oil-git/releases/tag/v0.1.0-test.1)随测试包发布。[Actions](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) 还提供后续提交的测试构建与检查报告，保留 14 天。各平台的验证范围见 [验证说明](docs/verification.md)；CI 安装检查不代表所有原生窗口体验都已验收。
+The packages include a CLI and the [oil-git Agent Skill](skills/oil-git/SKILL.md). The CLI can open a project in the existing app window or print a read-only JSON snapshot:
 
-| 快捷键            | 操作               |
-| ----------------- | ------------------ |
-| ⌘ O / Ctrl O      | 打开项目           |
-| ↑ / ↓，然后 Enter | 选择提交并查看详情 |
-| Esc               | 关闭详情或取消拖拽 |
-| ⌘ R / Ctrl R      | 刷新仓库           |
-
-## 让 AI Agent 打开
-
-随安装包提供 CLI 和 [oil-git Skill](skills/oil-git/SKILL.md)。将启动器加入 PATH 后，Agent 可以打开你正在做的项目，或读取真实仓库快照：
-
-```bash
-oil-git open "." --view changes
-oil-git open "." --view history
-oil-git inspect "." --json
+```sh
+oil-git open . --view changes
+oil-git open . --view history
+oil-git inspect . --json
 oil-git skill --path
+oil-git --lang en --help
 ```
 
-打开请求会复用已有窗口；`inspect` 输出只读 JSON，不启动窗口。Mac 启动器在应用的 `Contents/Resources/bin` 中，Windows 可直接调用安装目录中的 `oil-git.exe`。Skill 随包提供，安装应用不会自动修改 Agent 宿主的设置。完整路径与接入方式见 [CLI 使用说明](docs/usage.md#ai-agent-与-cli)。
+Use `--lang en` or `--lang zh-CN` with CLI commands to choose the language explicitly. Without it, CLI messages follow the available system locale. `inspect` reads the local repository and does not open the app. The Skill is included with the package; installing oil-git does not change the host agent's settings. See the [CLI guide](docs/usage.md#cli-and-ai-agents) for launcher paths and integration details.
 
-## 只读与支持范围
+## Read-only boundary
 
-oil-git 不执行提交、切分支、合并、拉取或撤销，也不改动所观察仓库的文件、暂存区、引用、配置与 LFS 对象。
+oil-git does not commit, stage, switch branches, merge, fetch, pull, reset, or undo changes. It does not modify the observed repository's files, index, refs, configuration, or LFS object store.
 
-- **标准 Git LFS** 可直接查看，无需安装 git-lfs。展示对象 ID 与大小，不自动下载文件；自定义 LFS 命令与扩展转换暂不支持。
-- **其他活动外部 Git 过滤器**会明确提示原因，查看时不会运行仓库配置的转换程序。
-- **普通与合并提交**默认比较第一个父提交；首次提交展示新增内容。
-- **二进制文件**有单独提示，文本差异超过 **240 KB** 时明确标注截断。
-- **裸仓库与部分克隆仓库**暂不支持。远程领先／落后数量以本地已有的跟踪记录为准。
+- Standard Git LFS pointers are read with the app's built-in read-only filter. The app shows object IDs and sizes without downloading file contents. Custom LFS commands and extensions are unsupported.
+- Repository-defined external content filters and converters are not run. If a filter prevents a safe read, the app explains the limitation.
+- Commits are compared with their first parent; an initial commit is shown as added content.
+- Image files can be compared visually. Audio and video files use the system media controls when their data is available. Other binary files show a byte comparison of at most the first 4 KiB per side.
+- Text diffs are limited to 240 KB and explicitly marked when truncated. Media previews have an 8 MiB input limit; large images also have a pixel limit.
+- Bare and partial-clone repositories are not supported. Upstream ahead/behind counts use local tracking records and do not imply a fetch.
 
-## 开发与贡献
+## Development
 
-使用 **Tauri 2 + React + TypeScript + Rust**。Rust 通过系统 Git 读取仓库，桌面内部接口不开放本地 HTTP 服务；历史与代码采用可见区域渲染。
+oil-git uses Tauri 2, React, TypeScript, and Rust. Rust reads repositories through the system Git executable. The desktop app does not expose a local HTTP server.
 
-```bash
+```sh
 npm ci
 npm run desktop
 ```
 
-开发需要 Node 22、Rust 与当前平台的 Tauri 开发依赖。测试、打包和实现细节见 [开发文档](docs/development.md)，实际测试范围见 [验证说明](docs/verification.md)。欢迎提交能复现的问题或改进 PR。
+Development requires Node.js 22, Rust, and the Tauri dependencies for your platform. Read the [development guide](docs/development.md) and [usage guide](docs/usage.md), or their [Simplified Chinese versions](docs/zh-CN/development.md) and [中文使用说明](docs/zh-CN/usage.md). See [Contributing](CONTRIBUTING.md) before making changes.
 
-## 许可证
+## License
 
-[MIT](LICENSE)。文件类型图标来自 [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme)，其他素材说明见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+[MIT](LICENSE). File type icons come from [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme). See [third-party notices](THIRD-PARTY-NOTICES.md) for other bundled materials.

@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import { DiffView } from "./DiffView";
+import { LanguageProvider } from "./i18n";
 import type { Diff } from "./types";
 
 afterEach(cleanup);
@@ -104,6 +105,42 @@ it("有原始差异时也呈现读取范围的限制说明", () => {
   );
   expect(screen.getByRole("status").textContent).toBe(note);
   expect(screen.getByText("Git 原始差异").closest("details")!.open).toBe(false);
+});
+it("二进制历史差异仍显示未确认 LFS 警告和原始诊断", () => {
+  localStorage.setItem("oil-git.language", "en");
+  const note =
+    "当前 Git 无法读取历史属性，以下是 Git 原始差异，未确认 LFS 状态。";
+  render(
+    <LanguageProvider>
+      <DiffView
+        data={{
+          ...base,
+          binary: true,
+          patch: "Binary files a/data.bin and b/data.bin differ",
+          note,
+          noteKey: "lfsAttributeSourceUnsupported",
+        }}
+      />
+    </LanguageProvider>,
+  );
+  expect(
+    screen.getByText("A binary file changed; text diff is unavailable."),
+  ).toBeTruthy();
+  expect(
+    screen.getByText(
+      "Git could not read historical LFS attributes. The raw diff is still available.",
+    ),
+  ).toBeTruthy();
+  const diagnostic = screen.getByText("View original diagnostic");
+  const details = diagnostic.closest("details")!;
+  expect(details.open).toBe(false);
+  fireEvent.click(diagnostic);
+  expect(details.open).toBe(true);
+  expect(details.textContent).toContain(note);
+  expect(screen.getByText("Raw Git diff")).toBeTruthy();
+  expect(
+    screen.getByText("Binary files a/data.bin and b/data.bin differ"),
+  ).toBeTruthy();
 });
 it("LFS 冲突展示真实双方对象，原始指针冲突按需查看", () => {
   render(

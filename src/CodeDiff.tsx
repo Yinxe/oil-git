@@ -10,6 +10,7 @@ import type { KeyboardEvent, PointerEvent } from "react";
 import { patchRows } from "./patch";
 import { VariableHeightIndex } from "./variableVirtualizer";
 import type { ConflictLine } from "./types";
+import { useI18n } from "./i18n";
 import "./code-diff.css";
 
 type Row = ReturnType<typeof patchRows>[number];
@@ -104,12 +105,13 @@ export function splitRows(rows: Row[]): SplitRow[] {
 }
 
 export function CodeDiff(props: PatchCodeDiffProps | RawCodeDiffProps) {
+  const { t } = useI18n();
   const rawLines = "rawLines" in props ? props.rawLines : undefined;
   const patch = "patch" in props ? props.patch : "";
   const layout = "layout" in props ? props.layout : "unified";
   const labels =
     ("labels" in props ? props.labels : undefined) ??
-    (["原始内容", "修改后的内容"] as [string, string]);
+    ([t("原始内容"), t("修改后的内容")] as [string, string]);
   const includeMetadata =
     "includeMetadata" in props ? (props.includeMetadata ?? false) : false;
   const ariaLabel = "ariaLabel" in props ? props.ariaLabel : undefined;
@@ -118,8 +120,11 @@ export function CodeDiff(props: PatchCodeDiffProps | RawCodeDiffProps) {
     onLineSelect && typeof value === "number" && value > 0 ? (
       <button
         className="line-number line-origin-button"
-        title={`查看第 ${value} 行最后修改者`}
-        aria-label={`${side === "before" ? "变更前" : "变更后"}第 ${value} 行归属`}
+        title={t("查看第 {line} 行最后修改者", { line: value })}
+        aria-label={t("{side}第 {line} 行归属", {
+          side: t(side === "before" ? "变更前" : "变更后"),
+          line: value,
+        })}
         onClick={() => onLineSelect(side, value)}
       >
         {value}
@@ -536,7 +541,7 @@ export function CodeDiff(props: PatchCodeDiffProps | RawCodeDiffProps) {
         }
         ref={leftViewport}
         tabIndex={0}
-        aria-label={ariaLabel ?? "统一代码差异"}
+        aria-label={ariaLabel ?? t("统一代码差异")}
         onScroll={(e) => onScroll(e.currentTarget.scrollTop, 0)}
       >
         <div className="code-spacer" style={{ height: visible.totalHeight }}>
@@ -627,7 +632,7 @@ export function CodeDiff(props: PatchCodeDiffProps | RawCodeDiffProps) {
         ref={divider}
         className="code-diff-divider"
         role="separator"
-        aria-label="调整左右差异宽度"
+        aria-label={t("调整左右差异宽度")}
         aria-orientation="vertical"
         aria-valuemin={25}
         aria-valuemax={75}

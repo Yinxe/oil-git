@@ -447,8 +447,21 @@ kbd {
   color: var(--error-fg);
   border-bottom: 1px solid var(--error-bg);
 }
-.error-banner span {
+.error-banner > div {
   flex: 1;
+  overflow-wrap: anywhere;
+}
+.error-diagnostic {
+  margin-top: 3px;
+}
+.error-diagnostic summary {
+  cursor: pointer;
+  color: inherit;
+}
+.error-diagnostic span {
+  display: block;
+  margin-top: 3px;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .error-banner button {

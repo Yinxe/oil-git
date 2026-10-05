@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useI18n } from "./i18n";
 
 export function SyncIndicator({
   busy,
@@ -7,6 +8,7 @@ export function SyncIndicator({
   busy: boolean;
   requestKey: string;
 }) {
+  const { t } = useI18n();
   const [active, setActive] = useState(document.visibilityState === "visible");
   const [visibleKey, setVisibleKey] = useState<string | null>(null);
   useEffect(() => {
@@ -25,7 +27,7 @@ export function SyncIndicator({
     <div
       className="sync-indicator"
       role="progressbar"
-      aria-label="正在同步仓库"
+      aria-label={t("正在同步仓库")}
     />
   );
 }

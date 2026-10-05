@@ -3,6 +3,8 @@ import type { Diff, ConflictLine, DiffOrigin } from "./types";
 import { LineAttribution } from "./LineAttribution";
 import { CodeDiff, CodeLines } from "./CodeDiff";
 import { FilePreviewDiff } from "./FilePreview";
+import { useI18n } from "./i18n";
+import { ErrorMessage } from "./ErrorMessage";
 import "./lfs-diff.css";
 export { patchRows } from "./patch";
 
@@ -16,25 +18,27 @@ function ConflictCode({
   rows: ConflictLine[];
   label: string;
 }) {
+  const { t } = useI18n();
   return rows.length ? (
     <CodeLines lines={rows} label={label} />
   ) : (
-    <p className="inline-note">这部分内容为空。</p>
+    <p className="inline-note">{t("这部分内容为空。")}</p>
   );
 }
 function LfsDiff({ data, labels }: { data: Diff; labels: [string, string] }) {
+  const { t, language } = useI18n();
   const lfs = data.lfs!;
   const states = [lfs.beforeState, lfs.afterState];
   return (
-    <section className="lfs-diff" aria-label="Git LFS 对象变化">
+    <section className="lfs-diff" aria-label={t("Git LFS 对象变化")}>
       <header>
         <h3>
           Git LFS
           {lfs.conflict && (
-            <span className="lfs-conflict-state">未解决冲突</span>
+            <span className="lfs-conflict-state">{t("未解决冲突")}</span>
           )}
         </h3>
-        <p>Git 保存的是文件指针。此处显示对象信息，不下载文件内容。</p>
+        <p>{t("Git 保存的是文件指针。此处显示对象信息，不下载文件内容。")}</p>
       </header>
       <div className="lfs-sides">
         {[lfs.before, lfs.after].map((pointer, index) => (
@@ -42,9 +46,12 @@ function LfsDiff({ data, labels }: { data: Diff; labels: [string, string] }) {
             <h4>{labels[index]}</h4>
             {pointer ? (
               <dl>
-                <dt>大小</dt>
+                <dt>{t("大小")}</dt>
                 <dd>
-                  {new Intl.NumberFormat("zh-CN").format(pointer.size)} 字节
+                  {new Intl.NumberFormat(
+                    language === "en" ? "en-US" : "zh-CN",
+                  ).format(pointer.size)}{" "}
+                  {t("字节")}
                 </dd>
                 <dt>SHA-256</dt>
                 <dd>
@@ -54,21 +61,37 @@ function LfsDiff({ data, labels }: { data: Diff; labels: [string, string] }) {
             ) : (
               <p>
                 {states[index] === "missing"
-                  ? "文件不存在"
+                  ? t("文件不存在")
                   : states[index] === "regular"
-                    ? "此侧是普通文件内容"
+                    ? t("此侧是普通文件内容")
                     : states[index] === "unsupported"
-                      ? "此侧不是受支持的 LFS 指针"
-                      : "无 LFS 对象"}
+                      ? t("此侧不是受支持的 LFS 指针")
+                      : t("无 LFS 对象")}
               </p>
             )}
           </section>
         ))}
       </div>
-      {data.note && <p className="lfs-note">{data.note}</p>}
+      {data.note && (
+        <div className="lfs-note">
+          {data.noteKey ? (
+            <ErrorMessage
+              error={{
+                kind: data.noteKey,
+                messageKey: data.noteKey,
+                message: data.note,
+              }}
+            />
+          ) : (
+            t(data.note)
+          )}
+        </div>
+      )}
       {data.patch && (
         <details className="raw-diff">
-          <summary>{lfs.conflict ? "原始指针冲突" : "原始指针差异"}</summary>
+          <summary>
+            {lfs.conflict ? t("原始指针冲突") : t("原始指针差异")}
+          </summary>
           <Patch patch={data.patch} />
         </details>
       )}
@@ -88,6 +111,7 @@ export function DiffView({
   origin?: DiffOrigin;
   active?: boolean;
 }) {
+  const { t } = useI18n();
   const [line, setLine] = useState<{
     side: "before" | "after";
     line: number;
@@ -118,8 +142,8 @@ export function DiffView({
           data={data}
           labels={
             data.lfs.conflict
-              ? ["当前分支", "合入分支"]
-              : (labels ?? ["变更前", "变更后"])
+              ? [t("当前分支"), t("合入分支")]
+              : (labels ?? [t("变更前"), t("变更后")])
           }
         />
       ) : data.preview ? (
@@ -127,52 +151,81 @@ export function DiffView({
           preview={data.preview}
           patch={data.patch}
           note={data.note}
+          noteKey={data.noteKey}
           encoding={data.encoding}
           active={active}
-          labels={data.preview.conflict ? ["当前分支", "合入分支"] : labels}
+          labels={
+            data.preview.conflict ? [t("当前分支"), t("合入分支")] : labels
+          }
         />
       ) : data.conflict ? (
         <>
-          <p className="diff-caption">{data.conflict.kind}</p>
+          <p className="diff-caption">{t(data.conflict.kind)}</p>
           {data.conflict.blocks.map((b, i) => (
             <section className="conflict-block" key={b.startLine}>
               <h3>
-                冲突 {i + 1}{" "}
+                {t("冲突 {index}", { index: i + 1 })}{" "}
                 <span>
-                  第 {b.startLine}–{b.endLine} 行
+                  {t("第 {start}–{end} 行", {
+                    start: b.startLine,
+                    end: b.endLine,
+                  })}
                 </span>
               </h3>
-              <div className="conflict-label">当前分支的内容</div>
-              <ConflictCode rows={b.ours} label="当前分支的内容" />
+              <div className="conflict-label">{t("当前分支的内容")}</div>
+              <ConflictCode rows={b.ours} label={t("当前分支的内容")} />
               {b.base.length > 0 && (
                 <details>
-                  <summary>共同起点</summary>
-                  <ConflictCode rows={b.base} label="共同起点" />
+                  <summary>{t("共同起点")}</summary>
+                  <ConflictCode rows={b.base} label={t("共同起点")} />
                 </details>
               )}
               <div className="conflict-label incoming">
-                合入的内容 {b.incoming && <span>· {b.incoming}</span>}
+                {t("合入的内容")} {b.incoming && <span>· {b.incoming}</span>}
               </div>
-              <ConflictCode rows={b.theirs} label="合入的内容" />
+              <ConflictCode rows={b.theirs} label={t("合入的内容")} />
             </section>
           ))}
           {data.conflict.note && (
-            <p className="inline-note">{data.conflict.note}</p>
+            <p className="inline-note">{t(data.conflict.note)}</p>
           )}
           <details className="raw-diff">
-            <summary>Git 原始差异</summary>
+            <summary>{t("Git 原始差异")}</summary>
             <Patch patch={data.patch} />
           </details>
         </>
+      ) : data.patch && data.note && data.noteKey ? (
+        <section className="unconfirmed-diff">
+          {data.binary && (
+            <p className="inline-note">
+              {t("二进制文件发生变化，无法显示文本差异。")}
+            </p>
+          )}
+          <div className="inline-note" role="status">
+            <ErrorMessage
+              error={{
+                kind: data.noteKey,
+                messageKey: data.noteKey,
+                message: data.note,
+              }}
+            />
+          </div>
+          <details className="raw-diff">
+            <summary>{t("Git 原始差异")}</summary>
+            <Patch patch={data.patch} />
+          </details>
+        </section>
       ) : data.binary ? (
-        <p className="inline-note">二进制文件发生变化，无法显示文本差异。</p>
+        <p className="inline-note">
+          {t("二进制文件发生变化，无法显示文本差异。")}
+        </p>
       ) : data.patch && data.note ? (
         <section className="unconfirmed-diff">
           <p className="inline-note" role="status">
-            {data.note}
+            {t(data.note)}
           </p>
           <details className="raw-diff">
-            <summary>Git 原始差异</summary>
+            <summary>{t("Git 原始差异")}</summary>
             <Patch patch={data.patch} />
           </details>
         </section>
@@ -187,7 +240,9 @@ export function DiffView({
             />
           )}
           {data.encoding && (
-            <p className="encoding-note">{data.encoding} · 按文本比较</p>
+            <p className="encoding-note">
+              {data.encoding} · {t("按文本比较")}
+            </p>
           )}
           <CodeDiff
             patch={data.patch}
@@ -196,11 +251,23 @@ export function DiffView({
             onLineSelect={selectLine}
           />
         </>
+      ) : data.note && data.noteKey ? (
+        <div className="inline-note" role="status">
+          <ErrorMessage
+            error={{
+              kind: data.noteKey,
+              messageKey: data.noteKey,
+              message: data.note,
+            }}
+          />
+        </div>
       ) : (
-        <p className="inline-note">{data.note || "当前比较范围没有差异。"}</p>
+        <p className="inline-note">
+          {data.note ? t(data.note) : t("当前比较范围没有差异。")}
+        </p>
       )}
       {data.truncated && (
-        <p className="inline-note">差异较大，仅展示前 240 KB。</p>
+        <p className="inline-note">{t("差异较大，仅展示前 240 KB。")}</p>
       )}
     </div>
   );

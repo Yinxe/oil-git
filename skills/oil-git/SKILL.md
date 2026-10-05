@@ -1,6 +1,6 @@
 ---
 name: oil-git
-description: 用 oil-git 打开本地 Git 项目并查看真实分支、提交、待提交修改和冲突；在用户要求通过 oil-git 查看项目或把 Agent 正在处理的仓库定位到桌面视图时使用。只负责读取与展示，不用于执行 Git 写操作、网站浏览或云端仓库管理。
+description: Open a user's local Git project in oil-git and inspect real branches, commits, changes, and conflicts. Use when the user asks to inspect a project with oil-git or to locate the repository they are working on in the desktop view. Read-only display only; do not use for Git write operations, website browsing, or cloud repository management.
 license: MIT
 metadata:
   version: "0.1.0"
@@ -8,56 +8,57 @@ metadata:
 
 # oil-git
 
-需要本地 oil-git 应用、系统 Git 和执行本地命令的能力。平台验证范围见项目的 [验证说明](https://github.com/oil-oil/oil-git/blob/main/docs/verification.md)。
+This Skill requires the local oil-git desktop app, system Git, and permission to run local commands. See the project's [verification guide](https://github.com/oil-oil/oil-git/blob/main/docs/verification.md) for platform validation status.
 
-先确定用户正在处理的本地项目目录。路径可以来自当前工作区或用户明确指定的目录；有多个候选且无法判断时再询问。
+Determine which local project the user means from the current workspace or a path they gave you. Ask only if there are multiple plausible projects and context does not resolve the choice.
 
-## 发现入口
+## Find the app
 
-先检查本机是否有 oil-git 命令。已有命令时直接使用，不重新安装。
+Check whether `oil-git` is already available. If it is, use that command without reinstalling.
 
-macOS 常规安装提供启动器：
+On macOS, the app includes this launcher:
 
     /Applications/oil-git.app/Contents/Resources/bin/oil-git
 
-也可以从用户实际安装的 oil-git.app 中读取同一相对位置。Windows 优先调用应用安装目录中的 oil-git.exe，不依赖 PowerShell 脚本执行策略；默认目录为 %LOCALAPPDATA%\oil-git。下文的 oil-git 代表已发现的完整入口。
+If the app is installed elsewhere, use that app's corresponding path. On Windows, use `oil-git.exe` in the app's installation directory. The optional PowerShell launcher is `bin/oil-git.ps1`; it accepts the same arguments. Do not change a user or machine execution policy to run it.
 
-Windows 的 bin/oil-git.ps1 是可选启动器。需要使用时按进程调用，不修改用户或机器级执行策略：
+Run `oil-git --version` to confirm the command works. If the app is missing or cannot start, explain what is missing and stop. Installing the app or changing the agent host's Skill configuration requires the user's authorization.
 
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "安装目录\bin\oil-git.ps1" --version
+## Read or open a project
 
-组织策略仍阻止脚本时，使用原生 exe。
+1.  Use `inspect` to read a real repository snapshot. Pass the path as its own argument and quote paths that contain spaces:
 
-对已发现的入口运行 --version。找不到应用或不能启动时，说明缺少的依赖并停止；安装应用或修改宿主的 Skill 配置需要用户授权。
+        oil-git inspect "/path/to/project" --json
 
-## 读取与打开
+    Success returns `status=ready` and `data`. Failure returns `status=error`, a stable `kind` and `messageKey`, a localized `message`, the original `diagnostic`, and a nonzero exit code. Handle a failure as reported; do not invent branch or commit data. Initializing an uninitialized project belongs to the normal development workflow.
 
-1. 调用 inspect 读取真实仓库快照。路径作为独立参数传入，包含空格时加引号。
+2.  Open the view that fits the user's task. Use `changes` to inspect edits or conflicts and `history` to inspect commits and branch relationships:
 
-       oil-git inspect "/项目路径" --json
+        oil-git open "/path/to/project" --view changes
+        oil-git open "/path/to/project" --view history
 
-   成功返回 status=ready 和 data；失败返回 status=error、kind、message，并以非零状态退出。失败时先处理提示，不编造提交或分支信息。未初始化项目的初始化由正常开发流程另行处理。
+    The command sends an open request to the desktop app and reuses its existing window. A successful request does not prove that the view finished loading or that it was visually checked.
 
-2. 根据用户任务打开视图。检查 Agent 的修改或冲突时使用 changes；看提交和分支关系时使用 history。
+3.  Explain the snapshot using its real data. `data.branch` is the current branch, `data.head` is the current commit, and `data.files` reports staged and unstaged changes separately. A file may appear in both scopes. `inspect` does not return full source diffs.
 
-       oil-git open "/项目路径" --view changes
-       oil-git open "/项目路径" --view history
+4.  When code details are needed, use the host's existing read-only Git access or inspect the corresponding file in the app. Unstaged changes compare the working tree with the index; staged changes compare the index with `HEAD`.
 
-   启动器会复用正在运行的窗口。打开命令只表示已发送打开请求，不代表已经完成视觉验证或修改仓库。
+5.  State what was actually read and which view was requested. Without a successful read, do not claim that the worktree is clean, a conflict is resolved, or a commit exists.
 
-3. 用快照解释当前状态。data.branch 是当前分支，data.head 是提交位置；data.files 中 staged 和 unstaged 分别表示暂存与工作区的变化，conflict 取自 Git 的未解决记录。同一文件可能同时存在两类变化。
+The CLI follows the system locale on first use. Pass `--lang en` or `--lang zh-CN` before or after the command to choose CLI messages explicitly, for example:
 
-   分析具体代码时，可用宿主已有的只读 Git 读取能力，或查看应用中的对应文件。未暂存差异比较工作区与暂存区；已暂存差异比较暂存区与 HEAD。inspect 不返回完整代码差异。
+    oil-git --lang en inspect "/path/to/project" --json
+    oil-git inspect "/path/to/project" --json --lang en
 
-4. 完成读取后，说明实际看到的变更及打开的视图。没有读取真实结果时，不声称“工作区干净”“冲突已解决”或“已提交”。
+The `kind`, `messageKey`, snapshot data, and original diagnostic remain stable across languages.
 
-## 状态边界
+## Boundaries
 
-- 所有数据保留在本机，不需要账号或云同步。
-- 领先与落后数量来自本地已有的远程跟踪记录，不代表已经向远程执行 fetch。
-- 分支筛选和工作树选择只切换观察对象，不执行 checkout。
-- 标准 Git LFS 仓库由应用自带的只读过滤器识别，不需要安装 git-lfs；差异显示指针对象信息，不自动下载内容。自定义过滤器或 LFS 扩展不受支持时，按真实错误处理。
-- 清除文本冲突标记不等于 Git 已标记解决；以文件的 conflict 状态为准。
-- 此 Skill 不授权提交、暂存、合并、重置或推送。用户另行要求这些操作时，交给正常开发流程处理。
+- Repository data stays on the local computer. No account or cloud sync is needed.
+- Ahead and behind counts use existing local remote-tracking records; they do not mean that a fetch occurred.
+- Branch filters and worktree selection change only the observed view. They do not run `checkout`.
+- Standard Git LFS pointers use the app's built-in read-only filter. It does not run repository LFS programs, download content, or write to the LFS object store. Unsupported custom filters and LFS extensions are reported as read errors.
+- Removing text conflict markers does not mark a conflict resolved in Git. Use Git's actual conflict state.
+- This Skill does not authorize staging, committing, merging, resetting, or pushing. Handle those only through the user's separately authorized development workflow.
 
-完整入口说明可用 oil-git --help 获取；oil-git skill 返回这份说明，oil-git skill --path 返回随应用安装的 Skill 文件位置。
+Run `oil-git --help` for CLI usage. `oil-git skill` prints this document; `oil-git skill --path` prints the installed file path.

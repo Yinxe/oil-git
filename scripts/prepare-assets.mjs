@@ -3,7 +3,8 @@ import fs from "node:fs";
 const palettes = JSON.parse(
   fs.readFileSync("scripts/theme-palettes.json", "utf8"),
 );
-let css = "/* 由 scripts/theme-palettes.json 生成；配色只在源配置中修改。 */\n";
+let css =
+  "/* Generated from scripts/theme-palettes.json; edit colors there. */\n";
 for (const [theme, values] of Object.entries(palettes)) {
   const selector =
     theme === "dark"

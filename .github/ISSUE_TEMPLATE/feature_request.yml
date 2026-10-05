@@ -1,0 +1,18 @@
+name: Feature request / 功能建议
+description: Propose an improvement to read-only Git browsing / 建议改进只读 Git 浏览
+labels: []
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: User need / 用户需求
+      description: What are you trying to understand or accomplish? / 想了解什么，或完成什么任务？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / 建议的行为
+      description: Describe the interaction and any alternatives. oil-git does not perform Git writes. / 描述交互与备选方式。oil-git 不提供 Git 写操作。
+    validations:
+      required: true

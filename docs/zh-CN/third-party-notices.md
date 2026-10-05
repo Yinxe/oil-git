@@ -1,16 +1,16 @@
-# Third-party notices
+# 第三方资源
 
-[简体中文](docs/zh-CN/third-party-notices.md)
+[English](../../THIRD-PARTY-NOTICES.md)
 
-File icons are from [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme). `package-lock.json` pins the dependency version. The build copies icons and their LICENSE from the official npm package; runtime assets are local.
+文件类型图标采用 [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme)，当前依赖版本由 package-lock.json 固定。构建时从官方 npm 包复制文件图标及 LICENSE，运行时只加载本机资源。
 
-This project implements the layout, interface icons, themes, and interactions. Theme palettes live in `scripts/theme-palettes.json` and generate the application's color styles.
+界面布局、功能图标、主题和交互由本工程实现。主题配置统一维护在 scripts/theme-palettes.json，构建时生成配色样式。
 
-Dark and light palettes draw on Atom's [One Dark](https://github.com/atom/one-dark-syntax/blob/master/styles/colors.less) and [One Light](https://github.com/atom/one-light-syntax/blob/master/styles/colors.less), adapted for text contrast, selection, and Git diff backgrounds. The green theme shares the accent palette with a neutral background.
+深色与浅色配色参考 Atom 的 [One Dark](https://github.com/atom/one-dark-syntax/blob/master/styles/colors.less) 与 [One Light](https://github.com/atom/one-light-syntax/blob/master/styles/colors.less)，对文字对比、选中态和 Git 差异背景作了工具界面的适配。绿色沿用相同的强调色，使用更中性的背景。
 
-## Atom One Dark / One Light license
+## Atom One Dark / One Light 许可
 
-Both upstream projects use the following MIT license:
+两份上游使用相同的 MIT 许可，原文如下：
 
 ```text
 Copyright (c) 2016 GitHub Inc.

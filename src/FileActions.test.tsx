@@ -13,6 +13,7 @@ import { CopyButton } from "./CopyButton";
 import { DiffView } from "./DiffView";
 import { LineAttribution } from "./LineAttribution";
 import { HistoryGraph } from "./HistoryGraph";
+import { LanguageProvider } from "./i18n";
 import type { Diff, LineOrigin, PreviewSide, Snapshot } from "./types";
 
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeText: vi.fn() }));
@@ -110,6 +111,27 @@ it("图片显示真实双方、切换对比方式，新增文件不提供双图�
     screen.getByRole("button", { name: "滑动" }).hasAttribute("disabled"),
   ).toBe(true);
   expect(screen.getByRole("img", { name: "变更后" })).toBeTruthy();
+});
+it("图片叠加控件用完整的本地化比较侧名称", () => {
+  localStorage.setItem("oil-git.language", "en");
+  render(
+    <LanguageProvider>
+      <DiffView
+        data={{
+          ...base,
+          preview: {
+            before: side,
+            after: side,
+            conflict: false,
+          },
+        }}
+        labels={["Staging area", "Working tree"]}
+      />
+    </LanguageProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Overlay" }));
+  expect(screen.getByText("Working tree opacity")).toBeTruthy();
+  expect(screen.getByRole("slider", { name: "Overlay opacity" })).toBeTruthy();
 });
 it("未知二进制按真实偏移高亮变化，截断不能冒充没有差异", () => {
   render(
@@ -363,6 +385,62 @@ it("行归属只接受当前文件与行号的响应", async () => {
     repoId: "repo",
     request: { ...origin, repoId: undefined, side: "before", line: 1 },
   });
+});
+it("英文行归属翻译未提交状态，但保留真实 Git 身份与提交主题", async () => {
+  localStorage.setItem("oil-git.language", "en");
+  vi.mocked(request).mockImplementation(async (_command, args) => {
+    const requestData = args as { request: { path: string } };
+    return requestData.request.path === "uncommitted.ts"
+      ? ({
+          hash: null,
+          author: "",
+          email: "",
+          timestamp: null,
+          subject: "此行尚未提交",
+          originalLine: 1,
+          line: 1,
+          path: "uncommitted.ts",
+        } satisfies LineOrigin)
+      : ({
+          hash: "a".repeat(40),
+          author: "作者",
+          email: "",
+          timestamp: null,
+          subject: "新增图片",
+          originalLine: 1,
+          line: 1,
+          path: "committed.ts",
+        } satisfies LineOrigin);
+  });
+  const origin = {
+    repoId: "repo",
+    mode: "unstaged" as const,
+    changesRevision: "revision",
+  };
+  const view = render(
+    <LanguageProvider>
+      <>
+        <LineAttribution
+          origin={{ ...origin, path: "uncommitted.ts" }}
+          selection={{ side: "after", line: 1 }}
+          onClose={() => {}}
+          active
+        />
+        <LineAttribution
+          origin={{ ...origin, path: "committed.ts" }}
+          selection={{ side: "after", line: 1 }}
+          onClose={() => {}}
+          active
+        />
+      </>
+    </LanguageProvider>,
+  );
+  expect(await screen.findByText("Not committed")).toBeTruthy();
+  expect(screen.getByText("This line is uncommitted")).toBeTruthy();
+  expect(screen.getByText("作者")).toBeTruthy();
+  expect(screen.getByText("新增图片")).toBeTruthy();
+  expect(screen.queryByText("Add image")).toBeNull();
+  view.unmount();
 });
 it("提交树显示作者，复制标题与完整 ID 不选择提交", async () => {
   const commit = {

@@ -3,6 +3,7 @@ import { layoutGraph, visibleEdges, curve, ROW_HEIGHT, COLORS } from "./graph";
 import { useGraphMotion } from "./useGraphMotion";
 import { CopyButton } from "./CopyButton";
 import type { Commit, Snapshot, Reference } from "./types";
+import { useI18n } from "./i18n";
 export function HistoryGraph({
   commits,
   snapshot,
@@ -20,6 +21,7 @@ export function HistoryGraph({
   resetKey: string;
   active?: boolean;
 }) {
+  const { t } = useI18n();
   const graph = useMemo(
     () => layoutGraph(commits, snapshot.head),
     [commits, snapshot.head],
@@ -88,7 +90,7 @@ export function HistoryGraph({
       className="graph-viewport"
       ref={viewport}
       tabIndex={0}
-      aria-label="提交历史，使用上下方向键选择，回车查看详情"
+      aria-label={t("提交历史，使用上下方向键选择，回车查看详情")}
       onScroll={(e) => {
         if (!active) return;
         const top = e.currentTarget.scrollTop;
@@ -218,13 +220,13 @@ export function HistoryGraph({
                     title={c.subject}
                   >
                     <span className="commit-title">
-                      {c.subject || "无提交说明"}
+                      {c.subject || t("无提交说明")}
                     </span>
                   </button>
                   <CopyButton
                     quiet
                     text={`${c.subject}\n${c.hash}`}
-                    label="复制提交标题与 ID"
+                    label={t("复制提交标题与 ID")}
                   />
                 </div>
                 <span

@@ -1,49 +1,65 @@
-# 使用说明
+# Using oil-git
 
-[返回项目首页](../README.md)
+[Home](../README.md) · [简体中文](zh-CN/usage.md)
 
-## 打开与浏览
+## Install and open a repository
 
-Mac 使用 DMG 安装包，将 oil-git 拖入 Applications。Windows 使用 setup.exe 安装包。当前版本为测试版。macOS 首次访问桌面等目录时可能询问文件访问权限；处理系统询问后，如页面提示读取超时，点击重试。
+On macOS, open the DMG and drag oil-git to Applications. On Windows, run the setup executable. The published downloads are test releases; see the release notes for their feature scope. Your computer needs Git, but running the packaged application does not require Node, Rust, or Python. The application detects Git in PATH and common installation locations. The Windows installer can download Microsoft's WebView2 runtime if it is missing.
 
-电脑需要已有 Git。应用会自动检测 PATH 和常见安装位置；缺失时提供官方安装入口与重新检测。运行应用不需要安装 Python、Node 或 Rust。Windows 缺少系统 WebView2 时，安装程序会下载微软运行组件。
+Use the project button or `⌘ O` / `Ctrl O` to select a repository. Selecting a subdirectory opens its enclosing repository. Recent projects are stored locally, and the last project is restored on restart. Removing a recent item only removes the application's record. It does not delete files or close the current project.
 
-点击左上角打开项目，或使用 ⌘ O / Ctrl O。选到项目子目录也会识别所属仓库。最近打开的目录保存在本机，重新启动时恢复上次项目。
+macOS may request access to Desktop or other protected folders. Respond to the system prompt and retry if the initial read times out.
 
-- 提交图展示真实父子关系、分支、标签和 HEAD。筛选只改变视图，返回 HEAD 定位到当前提交。
-- 左侧常驻“更改”“暂存的更改”和出现时的“合并的更改”。同一文件可分别出现在暂存与工作区两组。组内按目录分类，连续的单目录合并展示，可展开与折叠。
-- 右侧切换“源码”和“分支”。点击左侧文件自动进入源码；切换视图保留文件选择、历史筛选和滚动位置。
-- 右上角可切换浅色、深色和绿色主题，选择保存在本机；深色与浅色参考 One Dark / One Light，默认深色。文字、分支图与差异颜色随主题一起切换。
-- 文件类型图标来自现成的 [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme)，按文件名和扩展名识别，资源随应用离线提供。
-- 标准 Git LFS 仓库可直接查看，无需另外安装 Git LFS。指针文件和已展开的文件内容按真实暂存范围识别；差异展示对象 ID 与大小，不自动下载文件。
-- 点击提交查看变更文件；普通与合并提交默认比较第一个父提交，首次提交展示新增内容。
-- 普通文本冲突展示实际冲突段及文件行号，LFS 冲突展示双方对象 ID 与大小。清除文本标记不等于 Git 已解决冲突。
-- 工作树选择器只切换观察目录。临时保存列表来自实际 stash。
-- 代码差异默认自动换行，保留原始行号。左右对照的对应行按较高的一侧对齐，不需要横向滚动。
-- 侧栏、提交图与详情、左右代码对照的分界都可拖动；也支持方向键调整。宽度偏好保存在本机，窄窗口临时压缩后会恢复；取消拖拽不保存临时位置。
-- 方向键选择提交，回车查看；Esc 关闭详情或取消拖拽；⌘ R / Ctrl R 刷新。
+## Explore changes and history
 
-应用只读取 Git，不执行提交、checkout、fetch、合并或撤销。CLI 快照中的领先与落后数量基于本地远程跟踪记录；远程记录更新后自动重新读取。图片支持可视化对照，其他二进制按文件类型预览或展示字节差异；文本差异超过 240 KB 时标明截断。裸仓库、需要按需下载 Git 对象的部分克隆仓库暂不支持。
+- The persistent sidebar separates **Staged changes**, **Changes**, and **Merge changes** when present. A file can appear in both staged and unstaged scopes; each selection compares the appropriate bytes.
+- **Changes** and **History** share the right-hand workspace. Switching views preserves file selection, history filters, and scroll positions. Selecting a changed file opens Changes.
+- The commit graph shows actual parents, branches, tags, and HEAD. Filtering a branch changes the view without checking it out. **Go to HEAD** locates the current commit.
+- Select a commit to read its changed files. Ordinary and merge commits compare against their first parent; an initial commit shows added content.
+- Commit metadata comes from local Git. Expand it to see email and committer information. Click a text-diff line number to inspect who last changed that line on the selected side. Copy controls beside commit titles, IDs, and file paths make relevant context easy to share with an AI agent. No GitHub login is needed.
+- Worktree selection changes the observed directory. Stashes are read from the repository's actual stash list.
 
-## AI Agent 与 CLI
+## Compare files
 
-Mac 可将 bin/oil-git 放进自己的 PATH，或直接运行这个入口。它立即返回，由桌面应用接收打开请求；应用已经运行时复用现有窗口。
+Text wraps by default, with original line numbers and aligned rows in side-by-side view. Text diffs are capped at 240 KB and show when output is truncated. UTF-16 BOM text is decoded for comparison; encoding-only changes remain visible. Line attribution is unavailable when decoded line numbers cannot reliably map to Git's original text.
 
-    oil-git open "/项目路径" --view changes
-    oil-git open "/项目路径" --view history
+Images support side-by-side, swipe, overlay, and pixel-difference modes. At 100% size, the two versions stack vertically. Added or deleted images show a single preview. Audio and video use the system WebView decoder and do not autoplay. Media reads are limited to 8 MiB per side; images with known dimensions are limited to 16 million pixels. Pixel comparison samples at most 2048 × 2048 pixels and labels this limit. Files that exceed these limits, fail to decode, or have no supported preview show file metadata and a byte comparison of the first 4 KiB.
 
-开发或安装在其他目录时，可用 OIL_GIT_APP 指定完整的 oil-git.app 路径。Windows 优先调用安装目录中的 oil-git.exe；可选启动器是 bin/oil-git.ps1，参数相同。需要调用脚本时使用 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "安装目录\bin\oil-git.ps1"，后接应用参数；无需修改用户或机器级执行策略。带空格的路径需要加引号。CLI 只读取与展示，不执行 Git 写操作。
+Text conflicts show the actual conflict sections and line numbers. LFS conflicts show object IDs and sizes. Removing textual conflict markers does not mean Git considers the conflict resolved.
 
-Agent 可以直接读取真实快照和配套 Skill：
+## Preferences and navigation
 
-    oil-git inspect "/项目路径" --json
-    oil-git skill
-    oil-git skill --path
+Use the toolbar menus to choose English or Simplified Chinese and Light, Dark, or Green themes. Language follows the system on first launch; explicit choices are saved locally. Switching language does not translate repository content. File icons are bundled [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) assets.
 
-inspect 成功返回 status=ready 和 data；失败返回 status=error、kind、message，并以非零状态退出。它不启动窗口，也不返回完整代码差异。Skill 和启动器随安装包提供；Mac 位于应用的 Contents/Resources 中，Windows 位于安装目录中。用户可将完整的 skills/oil-git 目录交给 Agent 按宿主规则安装；安装应用不会自动修改其他宿主的 Skill 设置。
+Drag pane dividers, or use arrow keys on a selected divider, to adjust widths. Preferences survive temporary constraints in narrow windows; cancelling a drag does not save its temporary size. Use arrow keys to select commits, Enter to inspect, Esc to close details or cancel a drag, and `⌘ R` / `Ctrl R` to refresh.
 
-## 只读范围
+## CLI and AI agents
 
-标准 Git LFS 转换由应用自带的只读过滤器处理，不运行仓库配置的 LFS 程序，不下载内容，也不向 LFS 对象库写入文件。自定义 LFS 转换命令和扩展转换暂不支持。
+On macOS, use the bundled `bin/oil-git` launcher directly or put it in your PATH. Set `OIL_GIT_APP` to the full `.app` path when it is installed elsewhere. On Windows, use the installed `oil-git.exe` or `bin/oil-git.ps1`. The launcher accepts the same arguments. Paths containing spaces need quotes.
 
-其他会运行外部 `clean`／`process` 转换程序的活动 Git 过滤器仍显示 `unsafeFilter` 及原因；未被文件属性使用的过滤器配置可正常读取。读取不会运行分页器或签名校验 helper，仓库路由环境不会覆盖用户选择的目录。
+```sh
+oil-git open "/path/to/repository" --view changes
+oil-git open "/path/to/repository" --view history
+oil-git inspect "/path/to/repository" --json
+oil-git inspect "/path/to/repository" --json --lang en
+oil-git skill
+oil-git skill --path
+```
+
+`open` sends a request to the desktop application, reusing its existing window. `inspect` reads a real snapshot without opening a window; it does not return full code diffs. Success returns `status=ready` with `data`; failure returns `status=error`, a stable `kind` and `messageKey`, a localized `message`, an original `diagnostic`, and a nonzero exit code. `--lang en` or `--lang zh-CN` selects human-readable CLI text without changing repository data.
+
+To invoke the optional Windows launcher without changing system execution policy:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path\to\bin\oil-git.ps1" inspect "C:\path\to\repository" --json
+```
+
+The launcher and Skill are packaged under `Contents/Resources` on macOS and the installation directory on Windows. You can give the complete `skills/oil-git` directory to your agent host for installation according to its rules. Installing oil-git does not change another application's Skill settings.
+
+## Read-only scope
+
+oil-git does not commit, checkout, fetch, merge, or undo changes. Ahead/behind counts describe locally available remote-tracking records. Bare repositories and partial clones that require downloading Git objects are currently unsupported.
+
+Standard Git LFS uses a bundled read-only filter: it does not run the repository's LFS program, download content, or write to the LFS object store. Pointers and expanded content are compared in their actual staged or unstaged scope. Custom LFS conversions and extensions are unsupported.
+
+Other active external `clean` or `process` filters are rejected with `unsafeFilter`; unused filter configuration does not prevent reading. Reads do not invoke pagers, external diff/text converters, or signature-verification helpers. Repository-routing environment variables cannot override the directory selected by the user.

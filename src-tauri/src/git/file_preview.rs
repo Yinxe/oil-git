@@ -244,7 +244,9 @@ fn unicode_text(content: &Content) -> Option<(String, &'static str)> {
         return None;
     }
     let units: Vec<_> = body
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             if le {
                 u16::from_le_bytes([pair[0], pair[1]])

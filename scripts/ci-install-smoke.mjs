@@ -1,4 +1,4 @@
-// 在原生 runner 上检查实际安装包。所有 Git 写入只用于创建临时测试仓库。
+// Verify the actual installed package on native runners. Git writes only create fixtures.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -14,7 +14,7 @@ const { values } = parseArgs({
   },
 });
 if (!values["artifact-dir"] || !values.report) {
-  throw new Error("请指定 --artifact-dir 与 --report。");
+  throw new Error("Specify --artifact-dir and --report.");
 }
 const reportFile = path.resolve(values.report);
 const report = {
@@ -22,7 +22,9 @@ const report = {
   architecture: process.arch,
   status: "running",
   checks: [],
-  limitations: ["未检查原生窗口、WebView 渲染、文件通知及视觉交互。"],
+  limitations: [
+    "Native windows, WebView rendering, file notifications, and visual interaction were not checked.",
+  ],
 };
 const run = (command, args, options = {}) =>
   execFileSync(command, args, {
@@ -65,7 +67,11 @@ try {
         ? file.endsWith(".dmg")
         : file.endsWith("setup.exe"),
   );
-  assert.equal(candidates.length, 1, "需要且只能提供一个当前平台的安装包");
+  assert.equal(
+    candidates.length,
+    1,
+    "Provide exactly one installer for the current platform",
+  );
   report.installer = path.basename(candidates[0]);
   report.installerSha256 = createHash("sha256")
     .update(fs.readFileSync(candidates[0]))
@@ -90,7 +96,7 @@ try {
     mounted = false;
     executable = path.join(app, "Contents", "MacOS", "oil-git");
     resources = path.join(app, "Contents", "Resources");
-    check("通用应用包含 arm64 与 x86_64", () => {
+    check("Universal application contains arm64 and x86_64", () => {
       const architectures = run("lipo", ["-archs", executable]).split(/\s+/);
       assert.ok(architectures.includes("arm64"));
       assert.ok(architectures.includes("x86_64"));
@@ -99,17 +105,19 @@ try {
     assert.equal(
       process.env.GITHUB_ACTIONS,
       "true",
-      "Windows 安装检查只在临时 GitHub runner 运行，避免改动本机的安装记录与快捷方式。",
+      "Windows installation checks require a disposable GitHub runner to avoid changing local installation records and shortcuts.",
     );
     resources = path.join(temporary, "安装 with space");
-    // NSIS 的 /D 必须放最后，且参数不能加引号；它会读取余下的完整路径。
+    // NSIS requires /D last, without quotes; it consumes the remaining full path.
     run(candidates[0], ["/S", `/D=${resources}`], {
       timeout: 300_000,
       windowsVerbatimArguments: true,
     });
     executable = path.join(resources, "oil-git.exe");
   }
-  check("安装后存在可执行文件", () => assert.ok(fs.existsSync(executable)));
+  check("Installed executable exists", () =>
+    assert.ok(fs.existsSync(executable)),
+  );
   const cli = (args) => run(executable, args);
   const launcher =
     process.platform === "darwin"
@@ -124,24 +132,40 @@ try {
             path.join(resources, "bin", "oil-git.ps1"),
             ...args,
           ]);
-  check("版本与帮助入口", () => {
+  check("Version and help entry points", () => {
     report.version = cli(["--version"]);
     assert.match(report.version, /^oil-git \d+\.\d+\.\d+/);
     assert.match(cli(["--help"]), /inspect/);
     assert.equal(launcher(["--version"]), report.version);
   });
-  check("安装包内的 Skill 与发现入口一致", () => {
-    const skillPath = cli(["skill", "--path"]);
-    assert.equal(
-      fs.realpathSync(skillPath),
-      fs.realpathSync(path.join(resources, "skills", "oil-git", "SKILL.md")),
+  check("English and Chinese CLI and bundled Skills", () => {
+    for (const [locale, file, helpPattern] of [
+      ["en", "SKILL.md", /Usage:/],
+      ["zh-CN", "SKILL.zh-CN.md", /用法/],
+    ]) {
+      assert.match(cli(["--help", "--lang", locale]), helpPattern);
+      assert.match(launcher(["--lang", locale, "--help"]), helpPattern);
+      const skillPath = cli(["skill", "--path", "--lang", locale]);
+      assert.equal(
+        fs.realpathSync(skillPath),
+        fs.realpathSync(path.join(resources, "skills", "oil-git", file)),
+      );
+      const content = fs.readFileSync(skillPath, "utf8").trim();
+      assert.equal(cli(["skill", "--lang", locale]), content);
+      assert.equal(launcher(["--lang", locale, "skill"]), content);
+    }
+    assert.ok(fs.existsSync(path.join(resources, "LICENSE")));
+    assert.ok(fs.existsSync(path.join(resources, "THIRD-PARTY-NOTICES.md")));
+    assert.ok(
+      fs.existsSync(
+        path.join(resources, "docs", "zh-CN", "third-party-notices.md"),
+      ),
     );
-    assert.equal(cli(["skill"]), fs.readFileSync(skillPath, "utf8").trim());
   });
 
   const repo = path.join(temporary, "项目 with space");
   fs.mkdirSync(repo);
-  // 夹具写入不启动后台维护；审计仍包括所有文件和锁文件。
+  // Fixture writes disable maintenance; the audit includes all files and locks.
   const git = (args) =>
     run("git", [
       "-c",
@@ -179,7 +203,11 @@ try {
     const expectedRoot = fs.statSync(repo, { bigint: true });
     const actualRoot = fs.statSync(snapshot.path, { bigint: true });
     assert.ok(actualRoot.isDirectory());
-    assert.notEqual(expectedRoot.ino, 0n, "文件系统未提供可验证的目录标识");
+    assert.notEqual(
+      expectedRoot.ino,
+      0n,
+      "Filesystem did not provide a verifiable directory identity",
+    );
     assert.equal(actualRoot.dev, expectedRoot.dev);
     assert.equal(actualRoot.ino, expectedRoot.ino);
     assert.equal(snapshot.branch, "main");
@@ -193,35 +221,86 @@ try {
     assert.ok(snapshot.refs.some((ref) => ref.name === "v0.1-fixture"));
     assert.ok(snapshot.historyRevision && snapshot.changesRevision);
   };
-  check("中文及空格路径，暂存与未暂存并存", () =>
-    verifySnapshot(inspect(cli, repo)),
+  check(
+    "Unicode and space-containing paths with staged and unstaged changes",
+    () => verifySnapshot(inspect(cli, repo)),
   );
-  check("从子目录识别真实仓库", () => verifySnapshot(inspect(cli, subdir)));
-  check("随包启动器支持 JSON 快照", () =>
-    verifySnapshot(inspect(launcher, repo)),
+  check("Resolve the repository from a subdirectory", () =>
+    verifySnapshot(inspect(cli, subdir)),
   );
-  check("无效目录返回 JSON 错误和非零退出码", () => {
-    for (const [commandName, command] of [
-      ["程序", cli],
-      ["启动器", launcher],
-    ]) {
-      for (const target of [temporary, path.join(temporary, "不存在")]) {
+  check("Bundled launcher supports JSON snapshots in both languages", () => {
+    verifySnapshot(inspect(launcher, repo));
+    for (const locale of ["en", "zh-CN"]) {
+      verifySnapshot(
+        JSON.parse(launcher(["--lang", locale, "inspect", repo, "--json"])),
+      );
+    }
+  });
+  check(
+    "Localized JSON errors preserve diagnostics and nonzero exit codes",
+    () => {
+      for (const [commandName, command] of [
+        ["binary", cli],
+        ["launcher", launcher],
+      ]) {
+        for (const target of [temporary, path.join(temporary, "不存在")]) {
+          let previous;
+          for (const locale of ["en", "zh-CN"]) {
+            assert.throws(
+              () => command(["inspect", target, "--json", "--lang", locale]),
+              (error) => {
+                assert.equal(error.status, 2);
+                const response = JSON.parse(error.stdout);
+                assert.equal(response.status, "error");
+                assert.ok(
+                  response.kind &&
+                    response.messageKey &&
+                    response.message &&
+                    response.diagnostic,
+                );
+                if (locale === "en")
+                  assert.doesNotMatch(response.message, /[\p{Script=Han}]/u);
+                if (previous) {
+                  assert.equal(response.kind, previous.kind);
+                  assert.equal(response.messageKey, previous.messageKey);
+                  assert.equal(response.diagnostic, previous.diagnostic);
+                  assert.notEqual(response.message, previous.message);
+                }
+                previous = response;
+                return true;
+              },
+              `${commandName} should reject directory: ${target} (${locale})`,
+            );
+          }
+        }
+      }
+    },
+  );
+  check("Malformed inspect locale arguments still return JSON errors", () => {
+    for (const command of [cli, launcher]) {
+      for (const args of [
+        ["inspect", repo, "--json", "--lang", "fr"],
+        ["inspect", repo, "--json", "--lang"],
+        ["--lang", "fr", "inspect", repo, "--json"],
+      ]) {
         assert.throws(
-          () => inspect(command, target),
+          () => command(args),
           (error) => {
             assert.equal(error.status, 2);
             const response = JSON.parse(error.stdout);
             assert.equal(response.status, "error");
-            assert.ok(response.kind && response.message);
+            assert.equal(response.kind, "arguments");
+            assert.equal(response.messageKey, "arguments");
+            assert.ok(response.message && response.diagnostic);
             return true;
           },
-          `${commandName} 应拒绝目录：${target}`,
         );
       }
     }
   });
-  check("读取前后文件、暂存区、引用和配置字节不变", () =>
-    assert.deepEqual(fixtureContents(repo), before),
+  check(
+    "Files, index, refs, and configuration remain byte-for-byte unchanged",
+    () => assert.deepEqual(fixtureContents(repo), before),
   );
 
   const lfsRepo = path.join(temporary, "LFS 项目 with space");
@@ -242,7 +321,7 @@ try {
       lfsRepo,
       ...args,
     ]);
-  // 测试数据直接暂存标准指针，构造过程也不依赖安装 git-lfs。
+  // Stage standard pointers directly; fixture creation does not require git-lfs.
   const stagePointers = () => lfsGit(["add", "."]);
   const pointer = (content) =>
     "version https://git-lfs.github.com/spec/v1\n" +
@@ -270,14 +349,17 @@ try {
     assert.equal(response.status, "ready");
     return response.data;
   };
-  check("未下载对象的 LFS 指针保持干净且只读", () => {
-    const unchanged = fixtureContents(lfsRepo);
-    assert.equal(inspectLfs().files.length, 0);
-    assert.deepEqual(fixtureContents(lfsRepo), unchanged);
-  });
+  check(
+    "LFS pointers without downloaded objects remain clean and read-only",
+    () => {
+      const unchanged = fixtureContents(lfsRepo);
+      assert.equal(inspectLfs().files.length, 0);
+      assert.deepEqual(fixtureContents(lfsRepo), unchanged);
+    },
+  );
   fs.writeFileSync(lfsFile, original);
-  // 在临时仓库记录已展开文件的 stat；手改指针后不暂存，Git 自身也会报 M。
-  // 使用随包转换器构造同一对象，不依赖 git-lfs 或写入 LFS 对象库。
+  // Record expanded-file stat in the fixture; otherwise Git reports a changed pointer.
+  // Use the bundled filter without git-lfs or writes to the LFS object store.
   const filterExecutable =
     process.platform === "win32"
       ? executable.replaceAll("\\", "/")
@@ -292,7 +374,7 @@ try {
     "--",
     "中文 文件.bin",
   ]);
-  check("已展开 LFS 内容保持干净且不写对象", () => {
+  check("Expanded LFS content remains clean without writing objects", () => {
     const unchanged = fixtureContents(lfsRepo);
     assert.equal(inspectLfs().files.length, 0);
     assert.deepEqual(fixtureContents(lfsRepo), unchanged);
@@ -301,7 +383,7 @@ try {
   fs.writeFileSync(lfsFile, pointer(Buffer.from("staged\0content\n")));
   stagePointers();
   fs.writeFileSync(lfsFile, Buffer.from("working\0content\n"));
-  check("LFS 暂存与未暂存独立识别且只读", () => {
+  check("LFS staged and unstaged changes remain separate and read-only", () => {
     const unchanged = fixtureContents(lfsRepo);
     const files = inspectLfs().files;
     assert.equal(files.length, 1);

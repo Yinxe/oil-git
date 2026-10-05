@@ -1,6 +1,14 @@
-import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
+import { useI18n } from "./i18n";
 export type MenuOption = {
   value: string;
   label: string;
@@ -30,7 +38,7 @@ export function Dropdown({
   searchable?: boolean;
   disabled?: boolean;
   className?: string;
-  message?: string | null;
+  message?: ReactNode;
   onRemoveOption?: (value: string) => Promise<boolean> | boolean;
   busy?: boolean;
 }) {
@@ -46,6 +54,7 @@ export function Dropdown({
     width: 320,
     maxHeight: 400,
   });
+  const { t } = useI18n();
   const trigger = useRef<HTMLButtonElement>(null),
     popup = useRef<HTMLDivElement>(null),
     input = useRef<HTMLInputElement>(null);
@@ -233,8 +242,8 @@ export function Dropdown({
                   <input
                     ref={input}
                     value={query}
-                    placeholder="搜索名称或路径"
-                    aria-label={"搜索" + label}
+                    placeholder={t("搜索名称或路径")}
+                    aria-label={t("搜索{label}", { label })}
                     onChange={(e) => {
                       setQuery(e.target.value);
                       setActive(0);
@@ -251,7 +260,7 @@ export function Dropdown({
                 }
               >
                 {!filtered.length && (
-                  <p className="menu-empty">没有匹配的结果</p>
+                  <p className="menu-empty">{t("没有匹配的结果")}</p>
                 )}
                 {filtered.map((option, index) => {
                   const optionButton = (
@@ -291,8 +300,10 @@ export function Dropdown({
                           <button
                             type="button"
                             className="menu-option-remove"
-                            aria-label={`从最近打开移除 ${option.label}`}
-                            title="从最近打开移除"
+                            aria-label={t("从最近打开移除 {name}", {
+                              name: option.label,
+                            })}
+                            title={t("从最近打开移除")}
                             disabled={busy || removingValue !== null}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ")

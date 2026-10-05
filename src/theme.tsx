@@ -6,11 +6,6 @@ import {
   type ReactNode,
 } from "react";
 export type Theme = "dark" | "light" | "green";
-export const THEMES = [
-  { value: "dark", label: "深色" },
-  { value: "light", label: "浅色" },
-  { value: "green", label: "绿色" },
-];
 export function loadTheme(): Theme {
   try {
     const value = localStorage.getItem("oil-git.theme");

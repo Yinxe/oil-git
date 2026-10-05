@@ -9,6 +9,7 @@ import {
   cleanup,
 } from "@testing-library/react";
 import App from "./App";
+import { LanguageProvider } from "./i18n";
 import { request } from "./api";
 import type { Project } from "./types";
 vi.mock("./useRepository", () => ({ useRepository: () => repo }));
@@ -117,6 +118,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+  localStorage.clear();
 });
 const resolve = async (index: number, text: string) =>
   act(async () =>
@@ -129,6 +132,39 @@ const resolve = async (index: number, text: string) =>
     }),
   );
 describe("常驻侧栏与右侧视图", () => {
+  it("切换语言即时翻译动态状态，同时保留视图、滚动和仓库节点", async () => {
+    repo.project = {
+      ...project,
+      snapshot: { ...project.snapshot, operation: "变基" },
+    };
+    localStorage.setItem("oil-git.language", "zh-CN");
+    render(
+      <LanguageProvider>
+        <App />
+      </LanguageProvider>,
+    );
+    const sidebar = screen.getByLabelText("源代码管理文件列表");
+    const graph = screen.getByLabelText(
+      "提交历史，使用上下方向键选择，回车查看详情",
+    );
+    graph.scrollTop = 170;
+    fireEvent.scroll(graph);
+    expect(screen.getByText(/变基/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "切换语言" }));
+    fireEvent.click(await screen.findByRole("option", { name: "英文" }));
+
+    expect(screen.getByLabelText("Source control files")).toBe(sidebar);
+    const translatedGraph = screen.getByLabelText(
+      "Commit history. Use the up and down arrow keys to select a commit, then press Enter to view details.",
+    );
+    expect(translatedGraph).toBe(graph);
+    expect(translatedGraph.scrollTop).toBe(170);
+    expect(screen.getByText(/Rebase/)).toBeTruthy();
+    expect(localStorage.getItem("oil-git.language")).toBe("en");
+    expect(document.documentElement.lang).toBe("en");
+  });
+
   it("同步保留提交内容并使用顶部进度，真正失败仍提示旧结果并可重试", () => {
     vi.useFakeTimers();
     repo.syncing = true;
@@ -143,7 +179,8 @@ describe("常驻侧栏与右侧视图", () => {
     repo.error = { kind: "io", message: "目录无法读取" };
     view.rerender(<App />);
     expect(screen.queryByRole("progressbar")).toBeNull();
-    expect(screen.getByText(/目录无法读取.*保留上次读取的结果/)).toBeTruthy();
+    expect(screen.getByText("目录无法读取")).toBeTruthy();
+    expect(screen.getByText("当前保留上次读取的结果。")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     expect(repo.retryError).toHaveBeenCalledOnce();
     vi.useRealTimers();

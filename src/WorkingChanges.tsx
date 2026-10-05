@@ -9,6 +9,8 @@ import type { WorkingFile } from "./useWorkingCopy";
 import { FileIcon } from "./FileIcon";
 import { ReadStatus } from "./ReadStatus";
 import { Collapse } from "./Collapse";
+import { useI18n } from "./i18n";
+import { ErrorMessage } from "./ErrorMessage";
 import "./changes-tree.css";
 
 type ChangeTreeDirectory = {
@@ -109,6 +111,7 @@ export function ChangesSidebar({
   onFile: (value: WorkingFile) => void;
 }) {
   const [collapsed, setCollapsed] = useState<string[]>([]);
+  const { t } = useI18n();
   const treeCache = useRef<{
     files: FileState[];
     groups: ChangeGroup[];
@@ -124,11 +127,11 @@ export function ChangesSidebar({
     return next;
   }, [files]);
   return (
-    <div className="changes-tree" aria-label="源代码管理文件列表">
+    <div className="changes-tree" aria-label={t("源代码管理文件列表")}>
       {!files.length && (
         <div className="source-clean">
           <Icon name="check" size={24} />
-          <p>没有待提交的更改</p>
+          <p>{t("没有待提交的更改")}</p>
         </div>
       )}
       {groups
@@ -147,7 +150,7 @@ export function ChangesSidebar({
               }
             >
               <Icon name="right" size={12} />
-              <strong>{g.title}</strong>
+              <strong>{t(g.title)}</strong>
               <span>{g.files.length}</span>
             </button>
             <Collapse expanded={!collapsed.includes(g.mode)}>
@@ -158,6 +161,7 @@ export function ChangesSidebar({
                 onFile,
                 collapsed,
                 setCollapsed,
+                t,
               )}
             </Collapse>
           </section>
@@ -173,6 +177,7 @@ function renderChangeEntries(
   onFile: (value: WorkingFile) => void,
   collapsed: string[],
   setCollapsed: (update: (old: string[]) => string[]) => void,
+  t: (key: string) => string,
   depth = 0,
 ): ReactNode {
   return entries.map((entry) => {
@@ -198,12 +203,12 @@ function renderChangeEntries(
             f.path +
             " · " +
             (mode === "staged"
-              ? "已暂存"
+              ? t("已暂存")
               : mode === "conflict"
-                ? "冲突"
+                ? t("冲突")
                 : f.untracked
-                  ? "未跟踪"
-                  : "未暂存")
+                  ? t("未跟踪")
+                  : t("未暂存"))
           }
           title={f.path + (f.oldPath ? " ← " + f.oldPath : "")}
           onClick={() => onFile({ path: f.path, mode })}
@@ -266,6 +271,7 @@ function renderChangeEntries(
             onFile,
             collapsed,
             setCollapsed,
+            t,
             depth + 1,
           )}
         </Collapse>
@@ -295,6 +301,7 @@ export function SourceEditor({
   origin?: DiffOrigin;
   active?: boolean;
 }) {
+  const { t } = useI18n();
   const [preferSplit, setPreferSplit] = useState(true),
     [wide, setWide] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
@@ -310,15 +317,15 @@ export function SourceEditor({
   const selected = files.find((f) => f.path === file?.path);
   const labels: [string, string] =
     file?.mode === "staged"
-      ? ["上次提交", "暂存区"]
+      ? [t("上次提交"), t("暂存区")]
       : selected?.untracked
-        ? ["尚不存在", "工作区"]
-        : ["暂存区", "工作区"];
+        ? [t("尚不存在"), t("工作区")]
+        : [t("暂存区"), t("工作区")];
   const captions = {
-    unstaged: selected?.untracked ? "未跟踪的新文件" : "暂存区 → 工作区",
-    staged: "上次提交 → 暂存区",
-    conflict: "尚未解决的冲突",
-    commit: "提交差异",
+    unstaged: selected?.untracked ? t("未跟踪的新文件") : t("暂存区 → 工作区"),
+    staged: t("上次提交 → 暂存区"),
+    conflict: t("尚未解决的冲突"),
+    commit: t("提交差异"),
   };
   return (
     <div className="changes-editor" ref={editor}>
@@ -328,7 +335,7 @@ export function SourceEditor({
             <div>
               <div className="file-heading-line">
                 <strong title={file.path}>{file.path.split("/").pop()}</strong>
-                <CopyButton text={file.path} label="复制文件路径" />
+                <CopyButton text={file.path} label={t("复制文件路径")} />
               </div>
               <span>{captions[file.mode]}</span>
             </div>
@@ -336,36 +343,36 @@ export function SourceEditor({
               !diff?.lfs &&
               !diff?.preview &&
               !diff?.binary && (
-                <div className="diff-tabs" aria-label="差异展示方式">
+                <div className="diff-tabs" aria-label={t("差异展示方式")}>
                   <button
                     aria-pressed={wide && preferSplit}
                     disabled={!wide}
-                    title={!wide ? "加宽窗口后可以左右对照" : undefined}
+                    title={!wide ? t("加宽窗口后可以左右对照") : undefined}
                     onClick={() => setPreferSplit(true)}
                   >
-                    左右对照
+                    {t("左右对照")}
                   </button>
                   <button
                     aria-pressed={!wide || !preferSplit}
                     onClick={() => setPreferSplit(false)}
                   >
-                    统一差异
+                    {t("统一差异")}
                   </button>
                 </div>
               )}
           </header>
           {error && (
             <div className="history-error" role="status">
-              {error.message}
-              {diff && " 当前保留上次读取的差异。"}
-              <button onClick={retry}>重试</button>
+              <ErrorMessage error={error} />
+              {diff && t(" 当前保留上次读取的差异。")}
+              <button onClick={retry}>{t("重试")}</button>
             </div>
           )}
           <div className="working-diff" key={file.path + file.mode}>
             <ReadStatus
               busy={loading && !error}
               requestKey={requestKey ?? file.path + file.mode}
-              label={diff ? "正在更新差异…" : "正在读取差异…"}
+              label={diff ? t("正在更新差异…") : t("正在读取差异…")}
             />
             {diff ? (
               <DiffView
@@ -381,7 +388,7 @@ export function SourceEditor({
       ) : (
         <div className="editor-empty">
           <Icon name="changes" size={25} />
-          <p>{files.length ? "选择文件，查看修改" : "工作区干净"}</p>
+          <p>{files.length ? t("选择文件，查看修改") : t("工作区干净")}</p>
         </div>
       )}
     </div>

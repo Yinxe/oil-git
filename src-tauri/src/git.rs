@@ -26,12 +26,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[serde(rename_all = "camelCase")]
 pub struct Error {
     pub kind: String,
+    pub message_key: String,
     pub message: String,
 }
 impl Error {
     pub fn new(kind: &str, message: impl Into<String>) -> Self {
         Self {
             kind: kind.into(),
+            message_key: kind.into(),
             message: message.into(),
         }
     }
@@ -1570,6 +1572,7 @@ impl Git {
                     current: p == repo,
                     available: p.is_dir(),
                     bare: false,
+                    detached: false,
                 });
             } else if let Some(t) = tree.as_mut() {
                 if let Some(branch) = field.strip_prefix("branch refs/heads/") {
@@ -1577,6 +1580,7 @@ impl Git {
                 }
                 if field == "detached" {
                     t.branch = "分离 HEAD".into();
+                    t.detached = true;
                 }
                 if field == "bare" {
                     t.bare = true;
@@ -1923,6 +1927,7 @@ impl Git {
             truncated: output.truncated,
             binary: false,
             note: None,
+            note_key: None,
             conflict: None,
             lfs: None,
             preview: None,
@@ -1951,6 +1956,7 @@ impl Git {
             Ok(lfs) => lfs,
             Err(error) if error.kind == "lfsAttributeSourceUnsupported" => {
                 diff.note = Some(error.message);
+                diff.note_key = Some(error.message_key);
                 None
             }
             Err(error) => return Err(error),
@@ -2013,6 +2019,7 @@ impl Git {
             truncated: false,
             binary: false,
             note: None,
+            note_key: None,
             conflict: None,
             lfs: None,
             preview: None,
@@ -2458,6 +2465,7 @@ pub struct Worktree {
     pub current: bool,
     pub available: bool,
     pub bare: bool,
+    pub detached: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Stash {
@@ -2529,6 +2537,8 @@ pub struct Diff {
     pub truncated: bool,
     pub binary: bool,
     pub note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note_key: Option<String>,
     pub conflict: Option<Conflict>,
     pub lfs: Option<LfsDiff>,
     #[serde(skip_serializing_if = "Option::is_none")]

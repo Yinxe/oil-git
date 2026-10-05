@@ -31,4 +31,4 @@ for (const id of ids) {
 }
 fs.writeFileSync("src/generated/file-icons.json", JSON.stringify(mappings));
 fs.copyFileSync(path.join(pkg, "LICENSE"), "public/file-icons/LICENSE.txt");
-console.log("已准备 " + ids.size + " 种文件图标");
+console.log("Prepared " + ids.size + " file icons");

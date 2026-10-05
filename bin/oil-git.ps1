@@ -1,23 +1,39 @@
 ﻿param([Parameter(ValueFromRemainingArguments = $true)][string[]]$LaunchArguments)
-# Windows Agent 入口，参数作为独立数组传给应用。
+# Pass arguments as an array to preserve spaces and Unicode paths.
 $TaskAppPath = Join-Path (Split-Path $PSScriptRoot -Parent) 'oil-git.exe'
 if (-not (Test-Path $TaskAppPath)) { $TaskAppPath = Join-Path $env:LOCALAPPDATA 'oil-git\oil-git.exe' }
 if (-not (Test-Path $TaskAppPath)) {
-    throw '没有找到 oil-git，请先安装应用。'
+    throw 'oil-git was not found. Install the application first. / 未找到 oil-git，请先安装应用。'
 }
-if ($LaunchArguments.Count -ge 2 -and $LaunchArguments[0] -eq 'open' -and -not [IO.Path]::IsPathRooted($LaunchArguments[1])) {
-    $LaunchArguments[1] = Join-Path (Get-Location).ProviderPath $LaunchArguments[1]
+$TaskCommand = ''
+$TaskLocaleValue = $false
+$TaskRepositoryPending = $false
+for ($TaskIndex = 0; $TaskIndex -lt $LaunchArguments.Count; $TaskIndex++) {
+    $TaskArgument = $LaunchArguments[$TaskIndex]
+    if ($TaskLocaleValue) {
+        $TaskLocaleValue = $false
+    } elseif ($TaskArgument -eq '--lang') {
+        $TaskLocaleValue = $true
+    } elseif (-not $TaskCommand) {
+        $TaskCommand = $TaskArgument
+        $TaskRepositoryPending = $TaskCommand -eq 'open'
+    } elseif ($TaskRepositoryPending) {
+        if (-not $TaskArgument.StartsWith('--') -and -not [IO.Path]::IsPathRooted($TaskArgument)) {
+            $LaunchArguments[$TaskIndex] = Join-Path (Get-Location).ProviderPath $TaskArgument
+        }
+        $TaskRepositoryPending = $false
+    }
 }
 $TaskPreviousEncoding = [Console]::OutputEncoding
 try {
     [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-    if ($LaunchArguments.Count -eq 0 -or $LaunchArguments[0] -eq 'open') {
-        # 桌面启动保持异步；返回码仅表示请求已发出。
+    if (-not $TaskCommand -or $TaskCommand -eq 'open') {
+        # Desktop launch is asynchronous; success only confirms dispatch.
         & $TaskAppPath @LaunchArguments
         $TaskExitCode = 0
     } else {
-        # GUI 子系统程序须接入管道，PowerShell 才会等待并更新退出码。
-        # 原样写出每行，避免格式化 JSON 或改变参数传递方式。
+        # A GUI-subsystem executable must use a pipeline for PowerShell to wait.
+        # Write each line verbatim, without reformatting JSON.
         & $TaskAppPath @LaunchArguments | ForEach-Object { [Console]::Out.WriteLine($_) }
         $TaskExitCode = $LASTEXITCODE
     }

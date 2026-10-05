@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { request, errorOf, RequestGate } from "./api";
 import type { Project, Snapshot, Commit, HistoryPage, GitError } from "./types";
+import { useI18n } from "./i18n";
 type Recent = { path: string; name: string };
 type Launch = { path: string; view: "changes" | "history" };
 type History = {
@@ -31,6 +32,7 @@ const empty: History = {
 };
 
 export function useRepository() {
+  const { t } = useI18n();
   const [project, setProject] = useState<Project | null>(null);
   const [recents, setRecents] = useState<Recent[]>([]);
   const [recentError, setRecentError] = useState<GitError | null>(null);
@@ -264,7 +266,11 @@ export function useRepository() {
   );
   const forgetRecent = useCallback(async (path: string) => {
     if (!path.trim()) {
-      setRecentError({ kind: "path", message: "最近项目路径无效。" });
+      setRecentError({
+        kind: "path",
+        messageKey: "path",
+        message: "最近项目路径无效。",
+      });
       return false;
     }
     hasOpenIntent.current = true;
@@ -303,14 +309,14 @@ export function useRepository() {
       const path = await open({
         directory: true,
         multiple: false,
-        title: "打开 Git 项目",
+        title: t("打开 Git 项目"),
       });
       if (typeof path === "string") await openPath(path);
     } catch (e) {
       failedOpen.current = null;
       setOpenError(errorOf(e));
     }
-  }, [openPath]);
+  }, [openPath, t]);
   const checkGit = useCallback(async () => {
     setGitStatus({ loading: true });
     try {

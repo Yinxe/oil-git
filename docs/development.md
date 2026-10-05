@@ -1,67 +1,76 @@
-# 开发、打包与验证
+# Development
 
-[返回项目首页](../README.md)
+[Home](../README.md) · [Contributing](../CONTRIBUTING.md) · [简体中文](zh-CN/development.md)
 
-## 开发与检查
+## Setup
 
-开发需要 Node 22、Rust 和对应平台的 Tauri 开发依赖。
+Use Node.js 22, Rust through rustup, Git, and the native [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your platform. `rust-toolchain.toml` pins Rust 1.99.0 with rustfmt and Clippy; CI uses the same version. On Windows, use the MSVC toolchain.
 
-    npm ci
-    npm run desktop
+```sh
+npm ci
+npm run desktop
+```
 
-    npm test
-    npm run build
-    cargo test --manifest-path src-tauri/Cargo.toml --tests
+`npm run desktop` starts the actual Tauri window. The Vite server is a development resource for that window, not a supported browser product.
 
-测试使用独立临时仓库，不修改录制项目。覆盖真实 Git 操作、只读保证、差异范围、历史分页、中文路径及前端请求乱序。
+## Checks
 
-    npm run format
-    npm run format:check
-    cargo fmt --manifest-path src-tauri/Cargo.toml --check
+```sh
+npm run format:check
+npm test
+npm run build
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+cargo test --manifest-path src-tauri/Cargo.toml --locked --tests
+```
 
-具体测试、实际桌面检查和平台限制见 [验证与平台范围](verification.md)。
+Use `npm run format` and `cargo fmt --manifest-path src-tauri/Cargo.toml` to format changes. Tests create independent temporary repositories. They cover real Git reads, scope separation, conflicts, history pagination, Unicode paths, request races, and read-only guarantees. Native-window and installation checks are separate; see [Verification](verification.md).
 
-## 构建
+Icons and theme CSS are generated before development, tests, and builds. Do not commit these outputs. Palette definitions live in `scripts/theme-palettes.json`; file icons come from the locked Material Icon Theme dependency.
 
-Mac 通用安装包同时包含 Apple Silicon 和 Intel：
+## Package
 
-    rustup target add aarch64-apple-darwin x86_64-apple-darwin
-    npm run package -- --target universal-apple-darwin --bundles app,dmg
+Build a macOS universal application and DMG on macOS:
 
-Windows x64：
+```sh
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+npm run package -- --target universal-apple-darwin --bundles app,dmg
+```
 
-    npm run package -- --target x86_64-pc-windows-msvc --bundles nsis
+Build a Windows x64 installer on Windows:
 
-安装包位于对应 Cargo target 下的 release/bundle。
+```sh
+npm run package -- --target x86_64-pc-windows-msvc --bundles nsis
+```
 
-### CI 测试与打包
+Outputs are under the selected Cargo target's `release/bundle` directory. Both languages, the Agent Skill, launchers, and license notices ship with the application. Published release assets are snapshots of their release commits, not automatically updated by subsequent source changes.
 
-将本工程作为 GitHub 仓库根目录，工作流 [.github/workflows/build.yml](../.github/workflows/build.yml) 在 push、PR 和手动运行时执行：
+## Continuous integration
 
-| 阶段       | 检查内容                                                                                                                                     |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 原生检查   | Mac ARM、Mac Intel、Windows x64 分别运行前端测试、类型与构建检查、格式检查、Rust Clippy 和真实 Git 仓库测试                                  |
-| 打包       | Mac 通用 DMG、Windows x64 NSIS；测试失败时不打包                                                                                             |
-| 安装后检查 | 同一个 Mac 通用包分别在两种架构安装，Windows 静默安装；运行已安装程序及随包启动器，验证 CLI、Skill、中文路径、子目录识别、LFS 状态和只读保证 |
+[Desktop CI](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) runs on pushes, pull requests, and manual dispatch:
 
-在 GitHub 的 Actions 页面打开“桌面测试与安装包”，可下载安装包及每个平台的 JSON 检查记录。安装包与报告保留 14 天，不自动发布 Release；并行的新运行会取消同一分支上尚未结束的旧运行。
+| Stage         | Scope                                                                                                                                                                                                                              |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checks        | Native macOS ARM64, macOS Intel, and Windows x64 runners: formatting, frontend tests/build, Rust Clippy, and real-Git integration tests                                                                                            |
+| Package       | Universal macOS DMG and Windows x64 NSIS installer, only after all source checks pass                                                                                                                                              |
+| Installed CLI | Install the universal DMG on both macOS architectures and the NSIS package on Windows; run the installed binary and launcher and verify bundled resources, CLI snapshots, Unicode paths, LFS behavior, and repository immutability |
 
-Mac 安装后检查也可以在本地执行：
+Artifacts and per-platform JSON reports are retained for 14 days. This workflow does not publish a Release. A newer run cancels an unfinished run on the same ref. Use the actual run result for a specific commit when reporting CI status.
 
-    node scripts/ci-install-smoke.mjs --artifact-dir "安装包所在目录" --report "reports/installed.json"
+The macOS installer check can also run locally:
 
-Mac 脚本将应用复制到独立临时目录，检查完成后删除测试目录，不替换已有的应用。Windows NSIS 会写入安装记录与快捷方式，因此脚本只允许在临时 GitHub runner 中运行。Git 写入只用于创建临时测试仓库，随后逐字节比较读取前后的文件、暂存区、引用和配置。CI 报告不代表原生窗口、文件通知或视觉交互已经验收，这些仍按验证说明完成桌面走查。
+```sh
+node scripts/ci-install-smoke.mjs --artifact-dir "/path/to/installer-directory" --report reports/installed.json
+```
 
-## 工程
+It copies the application into an independent temporary directory and removes that directory afterwards. Windows NSIS changes installation records and shortcuts, so this check is restricted to disposable GitHub Actions runners. Fixture creation is the only phase that writes Git data; subsequent checks compare the repository bytes before and after reads.
 
-React 负责图、文件列表和详情；Rust 调用标准 Git 命令。桌面内部接口以仓库会话为范围，不开放本地 HTTP 服务。变化通知经过合并后刷新；窗口处于前台时每三秒补查，恢复焦点时立即检查。
+## Architecture and behavior
 
-仓库打开、快照、历史和详情分别管理请求归属；历史变化后重建分页。提交图与详情面板是本项目自绘组件，动画仅呈现真实数据变化，并尊重系统减少动态效果设置。
+React renders the graph, file lists, and details. Rust calls standard Git commands through repository-scoped desktop interfaces; there is no local HTTP service. File notifications are coalesced. The foreground window also polls every three seconds and checks immediately when focus returns.
 
-短请求不显示骨架屏，超过 200 毫秒后才就近显示读取提示。提交详情与默认文件差异用一次内部读取返回，完整内容准备好后再展开面板；同一比较范围刷新时保留内容。切换提交文件保留代码视窗，读完再整体替换；提交信息可展开为独立信息区。最近查看的提交结果有数量与 6 MB 内存上限，工作区差异缓存最多保留 12 项和 24 MiB。
+Open, snapshot, history, and detail requests have explicit ownership. History changes invalidate pagination. Commit details and the default diff share an effective history version and appear together. Refreshes retain the displayed content while the next result is read. Reads shorter than 200 ms do not show a loading hint; slower hints stay in the relevant region.
 
-自动换行使用变高虚拟列表，只测量可见代码行；左右对照共享行高。拖拽由动画帧合并尺寸更新，展开收起可从当前高度反向过渡。尊重系统减少动态效果设置；变化通知和后台补查仅针对当前仓库。
+Commit results have a count limit and a 6 MB cache budget; working changes retain at most 12 diffs and 24 MiB. Code and history render only visible rows. Wrapped code measures natural row heights, and side-by-side rows use the greater height. Drag updates are combined with animation frames. Hidden views and reduced-motion preferences stop presentation animations.
 
-图片比较使用暂存区、工作区及提交中真实的文件字节，支持并排、滑动、叠加与像素差异；100% 原尺寸模式上下排列，新增和删除图片显示单侧预览。正常图片不显示字节差异入口。音视频使用系统 WebView 解码和播放，不自动播放。每侧媒体最多读取 8 MiB，已识别尺寸的图片最多 1600 万像素；像素差异最多按 2048 × 2048 画布采样并明确标注。不能解码、超限和其他二进制文件直接显示类型、大小及前 4 KiB 字节差异，字节行按可见区域渲染。UTF-16 BOM 文本可按解码后的内容比较，仅转编码时仍保留字节变化。LFS 继续显示指针对象信息，不下载内容。
-
-提交树和详情显示本地 Git 作者；详情可展开邮箱和提交者信息。点击文本差异行号可查询该比较侧最后修改者，复制按钮提供路径、标题、完整提交 ID 和行归属。工作区归属读取最多 240 KB，UTF-16 解码差异不提供不可靠的原始 Git 行号归属；历史按单行查询。所有读取禁用外部转换器，响应绑定已显示差异版本；无需 GitHub 登录或网络访问。
+User-facing English and Chinese text lives in `src/i18n.tsx`. Preserve original repository data, stable JSON fields, error kinds, and message keys across languages. Test language changes without resetting the selected repository, file, or view. The detailed engineering constraints are in [AGENTS.md](../AGENTS.md).

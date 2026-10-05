@@ -7,6 +7,8 @@ import {
 } from "react";
 import { CodeDiff } from "./CodeDiff";
 import type { FilePreview, PreviewSide } from "./types";
+import { useI18n } from "./i18n";
+import { ErrorMessage } from "./ErrorMessage";
 import "./file-preview.css";
 
 export function fileSize(size: number) {
@@ -21,6 +23,7 @@ function SideInfo({
   side: PreviewSide | null;
   label: string;
 }) {
+  const { t } = useI18n();
   return (
     <header className="preview-side-heading">
       <strong>{label}</strong>
@@ -34,7 +37,7 @@ function SideInfo({
             ]
               .filter(Boolean)
               .join(" · ")
-          : "文件不存在"}
+          : t("文件不存在")}
       </span>
     </header>
   );
@@ -52,6 +55,7 @@ function Media({
   active: boolean;
   onDecodeFailure: () => void;
 }) {
+  const { t } = useI18n();
   const [failed, setFailed] = useState(false);
   const media = useRef<HTMLMediaElement | null>(null);
   useEffect(() => {
@@ -78,14 +82,14 @@ function Media({
     setFailed(true);
     onDecodeFailure();
   };
-  if (!side) return <div className="preview-empty">文件不存在</div>;
+  if (!side) return <div className="preview-empty">{t("文件不存在")}</div>;
   if (!side.dataUrl || failed)
     return (
       <div className="preview-empty">
-        {side.note ||
+        {(side.note && t(side.note)) ||
           (failed
-            ? "无法解码此格式，可在下方查看字节差异。"
-            : "此格式显示文件信息和字节差异。")}
+            ? t("无法解码此格式，可在下方查看字节差异。")
+            : t("此格式显示文件信息和字节差异。"))}
       </div>
     );
   if (side.kind === "image")
@@ -139,12 +143,17 @@ function PixelDifference({
   after: string;
   onDecodeFailure: () => void;
 }) {
+  const { t } = useI18n();
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [note, setNote] = useState("正在计算像素差异…");
+  const [note, setNote] = useState<
+    | { kind: "loading" }
+    | { kind: "error" }
+    | { kind: "result"; downsampled: boolean; percent: string }
+  >({ kind: "loading" });
   useEffect(() => {
     let live = true;
     if (canvas.current) canvas.current.width = canvas.current.height = 0;
-    setNote("正在计算像素差异…");
+    setNote({ kind: "loading" });
     const decode = (src: string) =>
       new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image();
@@ -199,15 +208,17 @@ function PixelDifference({
         canvas.current.width = width;
         canvas.current.height = height;
         output.putImageData(left, 0, 0);
-        setNote(
-          `${scale < 1 ? "缩小采样 · " : ""}${((changed / (width * height)) * 100).toFixed(2)}% 像素变化 · 黑色表示相同，亮色表示变化`,
-        );
+        setNote({
+          kind: "result",
+          downsampled: scale < 1,
+          percent: ((changed / (width * height)) * 100).toFixed(2),
+        });
         layer.width = layer.height = 0;
       })
       .catch(() => {
         if (live) {
           if (canvas.current) canvas.current.width = canvas.current.height = 0;
-          setNote("无法计算此格式的像素差异，请使用并排或滑动对比。");
+          setNote({ kind: "error" });
           onDecodeFailure();
         }
       });
@@ -217,8 +228,17 @@ function PixelDifference({
   }, [before, after]);
   return (
     <div className="pixel-difference">
-      <canvas ref={canvas} aria-label="像素差异图" />
-      <p role="status">{note}</p>
+      <canvas ref={canvas} aria-label={t("像素差异图")} />
+      <p role="status">
+        {note.kind === "loading"
+          ? t("正在计算像素差异…")
+          : note.kind === "error"
+            ? t("无法计算此格式的像素差异，请使用并排或滑动对比。")
+            : (note.downsampled ? t("缩小采样 · ") : "") +
+              t("{percent}% 像素变化 · 黑色表示相同，亮色表示变化", {
+                percent: note.percent,
+              })}
+      </p>
     </div>
   );
 }
@@ -233,6 +253,7 @@ function ImageComparison({
   active: boolean;
   onDecodeFailure: () => void;
 }) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<ImageMode>("split");
   const [zoom, setZoom] = useState(false);
   const [position, setPosition] = useState(50);
@@ -262,15 +283,15 @@ function ImageComparison({
     height = Math.max(oldSize[1], nextSize[1]);
   if (!active) return null;
   return (
-    <section className="image-comparison" aria-label="图片差异">
+    <section className="image-comparison" aria-label={t("图片差异")}>
       <div className="preview-toolbar">
-        <div className="diff-tabs" aria-label="图片对比方式">
+        <div className="diff-tabs" aria-label={t("图片对比方式")}>
           {(
             [
-              ["split", zoom ? "上下" : "并排"],
-              ["wipe", "滑动"],
-              ["overlay", "叠加"],
-              ["difference", "像素差异"],
+              ["split", zoom ? t("上下") : t("并排")],
+              ["wipe", t("滑动")],
+              ["overlay", t("叠加")],
+              ["difference", t("像素差异")],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -284,9 +305,9 @@ function ImageComparison({
           ))}
         </div>
         {currentMode === "split" && (
-          <div className="diff-tabs" aria-label="图片缩放">
+          <div className="diff-tabs" aria-label={t("图片缩放")}>
             <button aria-pressed={!zoom} onClick={() => setZoom(false)}>
-              适应
+              {t("适应")}
             </button>
             <button aria-pressed={zoom} onClick={() => setZoom(true)}>
               100%
@@ -298,8 +319,8 @@ function ImageComparison({
         <>
           {(!before || !after) && (
             <p className="inline-note">
-              {before ? "图片已删除" : "新增图片"} · {labels[before ? 1 : 0]}
-              文件不存在
+              {before ? t("图片已删除") : t("新增图片")} ·{" "}
+              {labels[before ? 1 : 0]} · {t("文件不存在")}
             </p>
           )}
           <div
@@ -345,7 +366,9 @@ function ImageComparison({
             <SideInfo side={after} label={labels[1]} />
           </div>
           {layerError ? (
-            <p className="inline-note">无法解码此格式，请使用字节差异。</p>
+            <p className="inline-note">
+              {t("无法解码此格式，请使用字节差异。")}
+            </p>
           ) : (
             <div className="image-layer-surface image-surface">
               <div
@@ -401,7 +424,9 @@ function ImageComparison({
           )}
           <label className="image-slider">
             <span>
-              {currentMode === "wipe" ? "对比分界" : labels[1] + "不透明度"}
+              {currentMode === "wipe"
+                ? t("对比分界")
+                : t("{label}的不透明度", { label: labels[1] })}
             </span>
             <input
               type="range"
@@ -409,7 +434,7 @@ function ImageComparison({
               max={100}
               value={position}
               aria-label={
-                currentMode === "wipe" ? "图片对比分界" : "叠加不透明度"
+                currentMode === "wipe" ? t("图片对比分界") : t("叠加不透明度")
               }
               onChange={(event) => setPosition(Number(event.target.value))}
             />
@@ -427,6 +452,7 @@ function HexDiff({
   preview: FilePreview;
   labels: [string, string];
 }) {
+  const { t } = useI18n();
   const [changedOnly, setChangedOnly] = useState(true);
   const [scrollTop, setScrollTop] = useState(0);
   const viewport = useRef<HTMLDivElement>(null);
@@ -455,31 +481,33 @@ function HexDiff({
     setScrollTop(0);
   }, [changedOnly, empty]);
   return (
-    <section className="hex-diff" aria-label="字节差异">
+    <section className="hex-diff" aria-label={t("字节差异")}>
       <header>
-        <strong>字节差异</strong>
+        <strong>{t("字节差异")}</strong>
         <label>
           <input
             type="checkbox"
             checked={changedOnly}
             onChange={(event) => setChangedOnly(event.target.checked)}
           />
-          仅显示变化
+          {t("仅显示变化")}
         </label>
       </header>
       {(preview.before?.hexTruncated || preview.after?.hexTruncated) && (
-        <p className="inline-note">每侧仅比较前 4 KiB，偏移以十六进制显示。</p>
+        <p className="inline-note">
+          {t("每侧仅比较前 4 KiB，偏移以十六进制显示。")}
+        </p>
       )}
       {!shown.length ? (
         <p className="inline-note">
           {preview.before?.hexTruncated || preview.after?.hexTruncated
-            ? "前 4 KiB 没有字节变化，后续内容未比较。"
-            : "内容字节相同，变化可能来自路径或文件模式。"}
+            ? t("前 4 KiB 没有字节变化，后续内容未比较。")
+            : t("内容字节相同，变化可能来自路径或文件模式。")}
         </p>
       ) : (
         <div className="hex-table">
           <div className="hex-labels">
-            <span>偏移</span>
+            <span>{t("偏移")}</span>
             <span>{labels[0]}</span>
             <span>{labels[1]}</span>
           </div>
@@ -531,17 +559,21 @@ export function FilePreviewDiff({
   preview,
   patch,
   note,
+  noteKey,
   encoding,
   active = true,
-  labels = ["变更前", "变更后"],
+  labels,
 }: {
   preview: FilePreview;
   patch: string;
   note?: string | null;
+  noteKey?: string;
   encoding?: string;
   active?: boolean;
   labels?: [string, string];
 }) {
+  const { t } = useI18n();
+  const sidesLabels = labels ?? [t("变更前"), t("变更后")];
   const sides = [preview.before, preview.after];
   const image = sides.some((side) => side?.kind === "image");
   const media = sides.some(
@@ -566,22 +598,29 @@ export function FilePreviewDiff({
     <div className="file-preview-diff">
       <div className="preview-summary">
         <span>
-          {preview.conflict ? "未解决冲突 · " : ""}
+          {preview.conflict ? t("未解决冲突") + " · " : ""}
           {delta
             ? `${delta > 0 ? "+" : "−"}${fileSize(Math.abs(delta))}`
-            : "大小不变"}
+            : t("大小不变")}
         </span>
       </div>
       {(note || encoding) && (
-        <p className="inline-note">
+        <div className="inline-note">
           {encoding && <span>{encoding} · </span>}
-          {note}
-        </p>
+          {note &&
+            (noteKey ? (
+              <ErrorMessage
+                error={{ kind: noteKey, messageKey: noteKey, message: note }}
+              />
+            ) : (
+              <span>{t(note)}</span>
+            ))}
+        </div>
       )}
       {image ? (
         <ImageComparison
           preview={preview}
-          labels={labels}
+          labels={sidesLabels}
           active={active}
           onDecodeFailure={decodeFailure}
         />
@@ -592,21 +631,21 @@ export function FilePreviewDiff({
               className="preview-side"
               data-side={index === 0 ? "before" : "after"}
               key={index}
-              aria-label={labels[index]}
+              aria-label={sidesLabels[index]}
             >
-              <SideInfo side={side} label={labels[index]} />
+              <SideInfo side={side} label={sidesLabels[index]} />
               {media ? (
                 <Media
                   side={side}
-                  label={labels[index]}
+                  label={sidesLabels[index]}
                   zoom={false}
                   active={active}
                   onDecodeFailure={decodeFailure}
                 />
               ) : (
                 <p className="binary-format">
-                  {side?.mime || "文件不存在"}
-                  {side?.note && <span>{side.note}</span>}
+                  {side?.mime || t("文件不存在")}
+                  {side?.note && <span>{t(side.note)}</span>}
                 </p>
               )}
             </section>
@@ -615,12 +654,12 @@ export function FilePreviewDiff({
       )}
       {showBytes && (
         <div className="preview-byte-fallback">
-          <HexDiff preview={preview} labels={labels} />
+          <HexDiff preview={preview} labels={sidesLabels} />
         </div>
       )}
       {patch && !patch.includes("Binary files ") && (
         <details className="raw-diff">
-          <summary>源码差异</summary>
+          <summary>{t("源码差异")}</summary>
           <CodeDiff patch={patch} layout="unified" includeMetadata />
         </details>
       )}

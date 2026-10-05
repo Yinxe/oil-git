@@ -1,4 +1,4 @@
-name: 桌面测试与安装包
+name: Desktop CI
 on:
   push:
   pull_request:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   check:
-    name: 原生检查 · ${{ matrix.platform }}
+    name: Checks · ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -49,7 +49,7 @@ jobs:
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --tests
 
   bundle:
-    name: 打包 · ${{ matrix.artifact }}
+    name: Package · ${{ matrix.artifact }}
     needs: check
     strategy:
       fail-fast: false
@@ -75,7 +75,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.99.0
         with:
           targets: ${{ matrix.rust_targets }}
       - uses: Swatinem/rust-cache@v2
@@ -94,7 +94,7 @@ jobs:
           retention-days: 14
 
   installed:
-    name: 安装后检查 · ${{ matrix.platform }}
+    name: Installed CLI · ${{ matrix.platform }}
     needs: bundle
     strategy:
       fail-fast: false
@@ -122,7 +122,7 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: installer
-      - name: 安装并检查只读 CLI
+      - name: Install and verify the read-only CLI
         run: node scripts/ci-install-smoke.mjs --artifact-dir installer --report reports/${{ matrix.platform }}.json
       - uses: actions/upload-artifact@v4
         if: always()

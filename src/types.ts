@@ -1,4 +1,4 @@
-export type GitError = { kind: string; message: string };
+export type GitError = { kind: string; message: string; messageKey?: string };
 export type Reference = {
   name: string;
   fullName: string;
@@ -21,6 +21,7 @@ export type Worktree = {
   current: boolean;
   available: boolean;
   bare: boolean;
+  detached?: boolean;
 };
 export type Snapshot = {
   path: string;
@@ -80,6 +81,7 @@ export type FilePreview = {
 };
 export type Diff = {
   patch: string;
+  noteKey?: string;
   lfs?: null | {
     conflict?: boolean;
     before: { oid: string; size: number } | null;

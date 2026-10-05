@@ -7,6 +7,7 @@ export function request<T>(
   if (!isTauri())
     return Promise.reject({
       kind: "desktopRequired",
+      messageKey: "desktopRequired",
       message: "请在 oil-git 桌面应用中打开。本地仓库读取需要桌面环境。",
     });
   return invoke<T>(command, args);

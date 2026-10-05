@@ -29,14 +29,14 @@
     "targets": "all",
     "icon": ["icons/icon.png", "icons/icon.icns", "icons/icon.ico"],
     "category": "DeveloperTool",
-    "shortDescription": "看清项目的分支、提交与文件变化",
+    "shortDescription": "Explore Git branches, commits, and file changes",
     "macOS": {
       "minimumSystemVersion": "12.0"
     },
     "windows": {
       "nsis": {
-        "displayLanguageSelector": false,
-        "languages": ["SimpChinese"],
+        "displayLanguageSelector": true,
+        "languages": ["English", "SimpChinese"],
         "installMode": "currentUser"
       },
       "webviewInstallMode": {
@@ -45,7 +45,10 @@
     },
     "resources": {
       "../skills/oil-git/": "skills/oil-git/",
-      "../bin/": "bin/"
+      "../bin/": "bin/",
+      "../LICENSE": "LICENSE",
+      "../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md",
+      "../docs/zh-CN/third-party-notices.md": "docs/zh-CN/third-party-notices.md"
     }
   }
 }

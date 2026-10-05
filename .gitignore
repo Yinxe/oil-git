@@ -1,24 +1,25 @@
+# Dependencies and generated assets
 node_modules/
+src/generated/
+public/file-icons/
+src/themes.css
+
+# Build outputs and caches
 dist/
 src-tauri/target/
 src-tauri/target-windows/
 src-tauri/.xwin-cache/
 .xwin-cache/
+src-tauri/gen/
+skills/dist/
+
+# Local settings and verification evidence
 .DS_Store
 验证材料/
 *.log
-
-src/generated/file-icons.json
-public/file-icons/
-src/themes.css
-
 交付/
-
-# 本机开发记录，不属于公开源码
 reviews/
 验证说明.md
 reports/
 .env
 .env.*
-src-tauri/gen/
-skills/dist/

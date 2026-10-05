@@ -1,38 +1,35 @@
-# 验证与平台范围
+# Verification
 
-## 本机已完成
+[Home](../README.md) · [Development](development.md) · [简体中文](zh-CN/verification.md)
 
-- 前端类型、格式、构建及组件测试。
-- Rust 格式、Clippy 和真实临时仓库集成测试，覆盖提交、分支、合并、冲突、stash、reset、rebase、工作树、外部 fetch、分页与只读检查。
-- macOS Apple Silicon 测试包安装、窗口打开、文件变化、长行差异、目录折叠和提交查看。
-- Windows x64 交叉编译与测试安装器生成；这不代表 Windows 原生运行验收。
+Verification has three separate parts: source checks, checks of an installed package, and native desktop/visual checks. Record each result against its commit or package; a successful CLI read does not establish that the window works.
 
-## GitHub Actions
+## Source checks
 
-[桌面测试与安装包](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) 在 Mac ARM、Mac Intel、Windows x64 上进行源码检查、安装包构建与安装后 CLI 检查。
+Run the commands in [Development](development.md) on the changed source. Git tests use independent temporary repositories and compare observed files, the index, refs, configuration, and LFS object storage before and after reads. Do not use a personal repository to construct test changes.
 
-每次运行的结果以 Actions 中该提交的实际记录为准。安装检查会读取中文及空格路径、识别子目录、核对 Skill 和启动器，验证 LFS 指针与已展开内容的状态，并比较测试仓库查看前后的文件、暂存区、引用、配置及 LFS 对象字节。
+## Installed package
 
-## 仍需人工确认
+Use [Desktop CI](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) for native macOS ARM64, macOS Intel, and Windows x64 installation checks. Results belong to the actual workflow run; a configured job, skipped job, or local cross-build is not a pass.
 
-原生窗口的交互、缩放、文件通知与阅读体验应在目标机器走查；CI 的 CLI 检查不能替代它们。测试包尚未配置自动更新。
+`scripts/ci-install-smoke.mjs` installs or copies the artifact and runs its actual binary and bundled launcher. It checks help/version, Skill discovery, Unicode and space-containing paths, staged/unstaged separation, LFS behavior, error exit codes, and byte-for-byte repository immutability. Its JSON report records platform, architecture, installer SHA-256, completed checks, and limitations. Reports and installers are uploaded together for inspection.
 
-本阶段不新增性能测量。差异有 240 KB 截断提示，历史分页和代码采用可见区域渲染。
+## Native desktop walkthrough
 
-## 2026-10-05 文件预览与作者归属
+On each target platform, open the installed application and a temporary real repository. Check the following when relevant to the change:
 
-本次验证平台为 macOS ARM64。前端全量 81 项、Rust 共 39 项通过。类型检查、前端构建、格式检查、Clippy 和 ARM64 debug 应用打包通过。
+- Open through the picker and launcher; repeated requests reuse the window. Test recent-project removal and startup restoration.
+- Verify file notifications and foreground refreshes preserve readable content; synchronization appears below the toolbar and stops when idle.
+- Navigate commit history, filters, pagination, details, and staged/unstaged/conflict files. Compare displayed data to local Git output.
+- Check wrapped long lines, variable row heights, original line numbers, pane resizing, keyboard selection, and scroll retention.
+- Inspect added, removed, and modified images, 100% vertical layout, audio/video, byte fallback, truncation, and line authorship using real fixtures.
+- Switch English/Chinese and all themes without losing repository or view state. Check dialogs, tooltips, accessible labels, copy feedback, and long translations.
+- Check reduced-motion behavior and inactive views. Copy controls should fade into a reserved space without shifting commit titles.
 
-原生窗口直接读取独立真实临时仓库，检查图片并排、滑动和像素变化、文本行作者、尚未提交的行、提交树与复制反馈；实际剪贴板包含文件行号、作者、完整提交 ID 和标题。用户提供示例对应的未跟踪 PNG 已在原生窗口显示图片。测试仓库包含 `.git` 的全部文件在查看前后 SHA-256 一致。
+Capture representative screenshots and note the operating system, architecture, application commit, and package digest. Record unchecked areas explicitly. Keep machine-specific logs and screenshots outside the public documentation; a PR can link relevant evidence.
 
-根据实际窗口反馈，移除图片预览中悬空的复制按钮和字节折叠入口，100% 原尺寸切为上下排列；新版窗口已检查该布局。深色、浅色和绿色主题均已做原生截图检查。
+## Platform limits
 
-debug 应用另打包为 ZIP，再解包到独立临时目录，运行解包后的原生窗口、程序和随包启动器，验证版本、真实 JSON 快照及 Skill 资源。包 SHA-256：`36e5f853935c5aa287f52866a8b4c8bd3988513a931c68c48b8e7ec3efadd8f5`。本次未运行 Windows、Mac Intel 或远端 Actions；ZIP 检查不等于 DMG 安装器验收。
+macOS packages are universal builds; the same DMG must be installed and exercised on both Apple Silicon and Intel. Windows uses an x64 NSIS installer. CI installation checks cover CLI behavior and bundled resources, not WebView rendering, file notifications, window interaction, or visual quality. These require a native walkthrough on the target machine.
 
-## 2026-10-05 同步提示与复制按钮
-
-本次验证平台为 macOS ARM64。前端全量 86 项、类型检查、格式检查及 debug / release 应用构建通过。持续变化、打开时自动重读、隐藏窗口暂停、新项目取消旧请求及移除最近项目后不被自动重读恢复均有回归覆盖。
-
-独立真实临时仓库持续写入时，CLI 确实返回 `changing`；原生窗口保留已有内容，工具栏下方显示细线流光，没有红色提示条。停止写入后流光自动消失。提交标题旁复制按钮、复制前后位置、真实剪贴板与底部状态栏移除均已在原生窗口检查；包括 `.git` 的 29 个测试文件恢复后 SHA-256 与初始记录一致。
-
-ARM64 release 应用已更新到本机应用目录，并实际运行安装后的原生窗口、程序、随包启动器和 Skill 资源，恢复原项目的源码视图。已安装程序 SHA-256：`56ecdc2f88883f7a9dbae2304e119c357af2779bafa4b1b2fec7b2aba8f043ba`。本批未运行 Rust 测试、Windows、Mac Intel、DMG 安装器或远端 Actions。
+Released test packages may predate features on the default branch. Consult the release commit and notes when reproducing an issue, and do not apply current source-check results to an older downloaded package.

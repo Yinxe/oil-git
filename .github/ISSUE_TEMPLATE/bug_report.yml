@@ -1,0 +1,18 @@
+name: Bug report / 问题反馈
+description: Report unexpected behavior in oil-git / 报告应用问题
+labels: []
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / 环境
+      description: OS, architecture, application version or commit, and Git version. / 系统、架构、应用版本或提交、Git 版本。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and expected behavior / 复现与预期
+      description: Include steps, actual and expected results, and a small temporary repository if useful. Remove private data from logs and screenshots. / 提供步骤、实际与预期结果；可附临时仓库。分享前移除私有信息。
+    validations:
+      required: true

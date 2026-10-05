@@ -8,6 +8,8 @@ import { CommitMetadata } from "./CommitMetadata";
 import { CopyButton } from "./CopyButton";
 import { useCommitMotion } from "./useCommitMotion";
 import type { GitError, Project, Selection } from "./types";
+import { useI18n } from "./i18n";
+import { ErrorMessage } from "./ErrorMessage";
 
 export type DetailState = {
   ready: boolean;
@@ -33,6 +35,7 @@ export function Details({
   commits?: readonly { hash: string }[];
   onStateChange?: (state: DetailState) => void;
 }) {
+  const { t, language } = useI18n();
   const view = useCommitView(project, selection, shown);
   const data =
     view.data &&
@@ -55,7 +58,11 @@ export function Details({
   const sameCommit =
     selection.kind === "commit" && data?.detail.hash === selection.hash;
   return (
-    <aside className="details" aria-label="所选对象详情" data-ready={ready}>
+    <aside
+      className="details"
+      aria-label={t("所选对象详情")}
+      data-ready={ready}
+    >
       {ready && (
         <div
           className="detail-content"
@@ -66,22 +73,22 @@ export function Details({
             <div className="detail-title-group">
               <h2>
                 {stash
-                  ? "临时保存"
-                  : (data?.detail.subject ?? subject ?? "无法读取提交")}
+                  ? t("临时保存")
+                  : (data?.detail.subject ?? subject ?? t("无法读取提交"))}
               </h2>
               {!stash && data && (
                 <CopyButton
                   quiet
                   text={data.detail.subject}
-                  label="复制提交标题"
+                  label={t("复制提交标题")}
                 />
               )}
             </div>
             <button
               className="icon-button"
               onClick={onClose}
-              title="关闭详情 · Esc"
-              aria-label="关闭详情"
+              title={t("关闭详情 · Esc")}
+              aria-label={t("关闭详情")}
             >
               <Icon name="close" />
             </button>
@@ -102,11 +109,14 @@ export function Details({
                   <p className="commit-author-line">
                     <strong>{data.detail.author}</strong>
                     <span>
-                      {new Date(data.detail.date).toLocaleDateString("zh-CN")}
+                      {new Date(data.detail.date).toLocaleDateString(
+                        language === "en" ? "en-US" : "zh-CN",
+                      )}
                     </span>
                   </p>
                   <p>
-                    {data.detail.comparison} · {data.detail.files.length} 个文件
+                    {t(data.detail.comparison)} ·{" "}
+                    {t("{count} 个文件", { count: data.detail.files.length })}
                   </p>
                   <CommitMetadata detail={data.detail} />
                 </div>
@@ -114,29 +124,28 @@ export function Details({
               <ReadStatus
                 busy={view.loading}
                 requestKey={view.requestKey}
-                label={
-                  sameCommit
-                    ? "正在更新差异…"
-                    : `正在读取${subject ? "：" + subject : "提交"}…`
-                }
+                label={sameCommit ? t("正在更新差异…") : t("正在读取提交…")}
               />
               {view.error && (
                 <div className="detail-message error-text" role="status">
-                  {data && "未更新，保留上次读取结果。"}
+                  {data && t("未更新，保留上次读取结果。")}
                   {data &&
                     !sameCommit &&
                     selection.kind === "commit" &&
-                    `读取 ${selection.hash.slice(0, 8)} 失败，当前显示 ${data.detail.hash.slice(0, 8)} 的内容。`}
-                  {view.error.message}
-                  <button onClick={view.retry}>重试</button>
+                    t("读取 {old} 失败，当前显示 {new} 的内容。", {
+                      old: selection.hash.slice(0, 8),
+                      new: data.detail.hash.slice(0, 8),
+                    })}
+                  <ErrorMessage error={view.error} />
+                  <button onClick={view.retry}>{t("重试")}</button>
                 </div>
               )}
               {data && (
                 <>
-                  <div className="file-list" aria-label="变更文件列表">
+                  <div className="file-list" aria-label={t("变更文件列表")}>
                     {!data.detail.files.length && (
                       <p className="detail-message">
-                        相对比较基准没有文件变化。
+                        {t("相对比较基准没有文件变化。")}
                       </p>
                     )}
                     {data.detail.files.map((file) => (
@@ -153,18 +162,20 @@ export function Details({
                         <span className="file-name" title={file.path}>
                           {file.path}
                           {file.oldPath && (
-                            <small>原路径：{file.oldPath}</small>
+                            <small>
+                              {t("原路径：{path}", { path: file.oldPath })}
+                            </small>
                           )}
                         </span>
                         <span className="file-status">
                           <span className="badge">
                             {(
                               {
-                                A: "新增",
-                                D: "删除",
-                                M: "修改",
-                                R: "重命名",
-                                T: "类型变化",
+                                A: t("新增"),
+                                D: t("删除"),
+                                M: t("修改"),
+                                R: t("重命名"),
+                                T: t("类型变化"),
                               } as Record<string, string>
                             )[file.status[0]] || file.status}
                           </span>
@@ -178,7 +189,10 @@ export function Details({
                         <span className="diff-path" title={data.filePath}>
                           {data.filePath}
                         </span>
-                        <CopyButton text={data.filePath} label="复制文件路径" />
+                        <CopyButton
+                          text={data.filePath}
+                          label={t("复制文件路径")}
+                        />
                       </div>
                       <div className="diff-scroll">
                         {data.diff && (
