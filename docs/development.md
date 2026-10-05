@@ -52,8 +52,6 @@ Mac 安装后检查也可以在本地执行：
 
 Mac 脚本将应用复制到独立临时目录，检查完成后删除测试目录，不替换已有的应用。Windows NSIS 会写入安装记录与快捷方式，因此脚本只允许在临时 GitHub runner 中运行。Git 写入只用于创建临时测试仓库，随后逐字节比较读取前后的文件、暂存区、引用和配置。CI 报告不代表原生窗口、文件通知或视觉交互已经验收，这些仍按验证说明完成桌面走查。
 
-正式分发前需要配置平台签名与 macOS 公证。详见 Tauri 的 [macOS 签名](https://v2.tauri.app/distribute/sign/macos/) 与 [Windows 签名](https://v2.tauri.app/distribute/sign/windows/)说明。
-
 ## 工程
 
 React 负责图、文件列表和详情；Rust 调用标准 Git 命令。桌面内部接口以仓库会话为范围，不开放本地 HTTP 服务。变化通知经过合并后刷新；窗口处于前台时每三秒补查，恢复焦点时立即检查。

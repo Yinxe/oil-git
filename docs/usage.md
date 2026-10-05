@@ -4,7 +4,7 @@
 
 ## 打开与浏览
 
-Mac 使用 DMG 安装包，将 oil-git 拖入 Applications。Windows 使用 setup.exe 安装包。当前版本为未配置正式分发签名的测试版本。macOS 首次访问桌面等目录时可能询问文件访问权限；处理系统询问后，如页面提示读取超时，点击重试。
+Mac 使用 DMG 安装包，将 oil-git 拖入 Applications。Windows 使用 setup.exe 安装包。当前版本为测试版。macOS 首次访问桌面等目录时可能询问文件访问权限；处理系统询问后，如页面提示读取超时，点击重试。
 
 电脑需要已有 Git。应用会自动检测 PATH 和常见安装位置；缺失时提供官方安装入口与重新检测。运行应用不需要安装 Python、Node 或 Rust。Windows 缺少系统 WebView2 时，安装程序会下载微软运行组件。
 

@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -59,12 +59,12 @@ jobs:
             target: universal-apple-darwin
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
             bundles: app,dmg
-            artifact: mac-universal-unsigned-test
+            artifact: mac-universal-test
           - os: windows-2022
             target: x86_64-pc-windows-msvc
             rust_targets: x86_64-pc-windows-msvc
             bundles: nsis
-            artifact: windows-x64-unsigned-test
+            artifact: windows-x64-test
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -73,7 +73,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -102,13 +102,13 @@ jobs:
         include:
           - os: macos-15
             platform: mac-arm64
-            artifact: mac-universal-unsigned-test
+            artifact: mac-universal-test
           - os: macos-15-intel
             platform: mac-intel
-            artifact: mac-universal-unsigned-test
+            artifact: mac-universal-test
           - os: windows-2022
             platform: windows-x64
-            artifact: windows-x64-unsigned-test
+            artifact: windows-x64-test
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -117,7 +117,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
       - uses: actions/download-artifact@v4
         with:
           name: ${{ matrix.artifact }}

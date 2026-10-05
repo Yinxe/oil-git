@@ -34,7 +34,7 @@
 
 ## 下载与开始
 
-当前提供 **未签名的 0.1.0 测试版**。
+当前提供 **0.1.0 测试版**。
 
 1. 下载对应平台的安装包：
    - **macOS Apple Silicon / Intel**：[通用 DMG](https://github.com/oil-oil/oil-git/releases/download/v0.1.0-test.1/oil-git_0.1.0_universal.dmg)。打开后将 oil-git 拖入 Applications。
