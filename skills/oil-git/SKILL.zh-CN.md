@@ -8,7 +8,7 @@ metadata:
 
 # oil-git
 
-此 Skill 需要本地 oil-git 桌面应用、系统 Git 和本地命令执行能力。平台验证状态见项目的[验证说明](https://github.com/oil-oil/oil-git/blob/main/docs/zh-CN/verification.md)。
+此 Skill 需要本地 oil-git 桌面应用、系统 Git 和本地命令执行能力。
 
 根据当前工作区或用户明确给出的路径，判断用户要查看哪个本地项目。只有存在多个候选且上下文无法判断时才询问。
 
@@ -45,7 +45,7 @@ macOS 安装包提供以下启动器：
 
 5.  说明实际读取到的内容和请求的视图。未成功读取时，不声称工作区干净、冲突已解决或提交已存在。
 
-CLI 首次使用时跟随系统区域设置。可在命令前或命令后加 `--lang en` 或 `--lang zh-CN` 指定 CLI 文案，例如：
+CLI 每次调用根据区域环境变量选择语言，未设置时使用英文；不沿用界面语言偏好。可在命令前或命令后加 `--lang en` 或 `--lang zh-CN` 指定 CLI 文案，例如：
 
     oil-git --lang zh-CN inspect "/项目路径" --json
     oil-git inspect "/项目路径" --json --lang zh-CN

@@ -7,7 +7,7 @@
   · <a href="LICENSE">MIT</a>
   · <a href="https://github.com/oil-oil/oil-git/releases">下载</a>
   · <a href="docs/zh-CN/usage.md">使用说明</a>
-  · <a href="CONTRIBUTING.md">贡献指南</a>
+  · <a href="docs/zh-CN/contributing.md">贡献指南</a>
   · <a href="skills/oil-git/SKILL.zh-CN.md">Agent Skill</a>
   · <a href="README.md">English</a>
 </p>
@@ -38,7 +38,7 @@
 
 ## 安装
 
-目前 [GitHub Releases](https://github.com/oil-oil/oil-git/releases) 中的是较早的测试版本，可能不包含本分支的双语界面与 CLI 更新。要体验当前改动，请使用对应提交的 [GitHub Actions 构建产物](https://github.com/oil-oil/oil-git/actions/workflows/build.yml)或[从源码构建](docs/zh-CN/development.md)。电脑需要已安装 Git；运行打包后的应用不需要 Python、Node.js 或 Rust。
+从 [GitHub Releases](https://github.com/oil-oil/oil-git/releases) 下载 macOS DMG 或 Windows x64 安装器。发布包的功能范围以对应标签和发布说明为准；默认分支的最新改动可使用对应提交的 [CI 构建产物](https://github.com/oil-oil/oil-git/actions/workflows/build.yml)，或[从源码构建](docs/zh-CN/development.md)。电脑需要已安装 Git；运行打包后的应用不需要 Python、Node.js 或 Rust。
 
 从工具栏打开项目，或按 macOS **⌘ O**、Windows **Ctrl O**。选择仓库内的子目录也会打开所属仓库。按 **⌘ R** 或 **Ctrl R** 刷新。
 
@@ -54,7 +54,7 @@ oil-git skill --path
 oil-git --lang zh-CN --help
 ```
 
-可对 CLI 命令使用 `--lang en` 或 `--lang zh-CN` 指定语言；不指定时按可用的系统区域设置选择。`inspect` 只读取本地仓库，不会打开窗口。Skill 随安装包提供，安装 oil-git 不会修改 Agent 宿主设置。启动器路径和接入方式见 [CLI 使用说明](docs/zh-CN/usage.md#cli-与-ai-agent)。
+可对 CLI 命令使用 `--lang en` 或 `--lang zh-CN` 指定语言；不指定时每次读取环境变量中的区域设置，未设置时使用英文；这与界面中保存的语言偏好独立。`inspect` 只读取本地仓库，不会打开窗口。Skill 随安装包提供，安装 oil-git 不会修改 Agent 宿主设置。启动器路径和接入方式见 [CLI 使用说明](docs/zh-CN/usage.md#cli-与-ai-agent)。
 
 ## 只读边界
 
@@ -62,21 +62,20 @@ oil-git 不执行提交、暂存、切换分支、合并、fetch、pull、reset 
 
 - 标准 Git LFS 指针由应用自带的只读过滤器读取。应用展示对象 ID 和大小，不下载文件内容；自定义 LFS 命令与扩展暂不支持。
 - 不运行仓库配置的外部内容过滤器或转换程序。若过滤器阻止安全读取，应用会说明限制。
-- 提交默认与第一个父提交比较；首次提交显示为新增内容。
-- 图片可视化对比；数据可用时，音频和视频通过系统媒体控件查看。其他二进制文件每侧最多比较前 4 KiB 字节。
-- 文本差异最多读取 240 KB，超出时会明确标注截断。媒体预览输入上限为 8 MiB，大图片还有像素上限。
 - 暂不支持裸仓库和部分克隆仓库。上游领先／落后数量来自本地跟踪记录，不代表执行了 fetch。
+
+文件差异、媒体预览和读取上限见[使用说明](docs/zh-CN/usage.md#文件差异)。
 
 ## 开发
 
-oil-git 使用 Tauri 2、React、TypeScript 和 Rust。Rust 通过系统 Git 读取仓库，桌面应用不开放本地 HTTP 服务。
+oil-git 使用 Tauri 2、React、TypeScript 和 Rust。Rust 通过系统 Git 读取仓库，打包后的应用不启动本地 HTTP 服务。
 
 ```sh
 npm ci
 npm run desktop
 ```
 
-开发需要 Node.js 22、Rust 和当前平台的 Tauri 开发依赖。参阅[开发文档](docs/zh-CN/development.md)和[使用说明](docs/zh-CN/usage.md)，也可阅读英文版[开发文档](docs/development.md)与[使用说明](docs/usage.md)。贡献前请阅读[贡献指南](CONTRIBUTING.md)。
+开发需要 Node.js 22、Rust 和当前平台的 Tauri 开发依赖。参阅[开发文档](docs/zh-CN/development.md)和[使用说明](docs/zh-CN/usage.md)，也可阅读英文版[开发文档](docs/development.md)与[使用说明](docs/usage.md)。贡献前请阅读[贡献指南](docs/zh-CN/contributing.md)。
 
 ## 许可证
 

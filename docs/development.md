@@ -24,7 +24,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D w
 cargo test --manifest-path src-tauri/Cargo.toml --locked --tests
 ```
 
-Use `npm run format` and `cargo fmt --manifest-path src-tauri/Cargo.toml` to format changes. Tests create independent temporary repositories. They cover real Git reads, scope separation, conflicts, history pagination, Unicode paths, request races, and read-only guarantees. Native-window and installation checks are separate; see [Verification](verification.md).
+Use `npm run format` and `cargo fmt --manifest-path src-tauri/Cargo.toml` to format changes. Tests create independent temporary repositories. They cover real Git reads, scope separation, conflicts, history pagination, Unicode paths, request races, and read-only guarantees. Native-window and installation checks are separate; see [Contributing](../CONTRIBUTING.md#verification).
 
 Icons and theme CSS are generated before development, tests, and builds. Do not commit these outputs. Palette definitions live in `scripts/theme-palettes.json`; file icons come from the locked Material Icon Theme dependency.
 
@@ -65,12 +65,6 @@ node scripts/ci-install-smoke.mjs --artifact-dir "/path/to/installer-directory" 
 
 It copies the application into an independent temporary directory and removes that directory afterwards. Windows NSIS changes installation records and shortcuts, so this check is restricted to disposable GitHub Actions runners. Fixture creation is the only phase that writes Git data; subsequent checks compare the repository bytes before and after reads.
 
-## Architecture and behavior
+## Source layout
 
-React renders the graph, file lists, and details. Rust calls standard Git commands through repository-scoped desktop interfaces; there is no local HTTP service. File notifications are coalesced. The foreground window also polls every three seconds and checks immediately when focus returns.
-
-Open, snapshot, history, and detail requests have explicit ownership. History changes invalidate pagination. Commit details and the default diff share an effective history version and appear together. Refreshes retain the displayed content while the next result is read. Reads shorter than 200 ms do not show a loading hint; slower hints stay in the relevant region.
-
-Commit results have a count limit and a 6 MB cache budget; working changes retain at most 12 diffs and 24 MiB. Code and history render only visible rows. Wrapped code measures natural row heights, and side-by-side rows use the greater height. Drag updates are combined with animation frames. Hidden views and reduced-motion preferences stop presentation animations.
-
-User-facing English and Chinese text lives in `src/i18n.tsx`. Preserve original repository data, stable JSON fields, error kinds, and message keys across languages. Test language changes without resetting the selected repository, file, or view. The detailed engineering constraints are in [AGENTS.md](../AGENTS.md).
+`src/` contains the React interface, state, and translations; `src-tauri/src/` provides read-only Git interfaces, file previews, and the LFS filter. `scripts/` contains the palette and file-icon generation entry points. See [AGENTS.md](../AGENTS.md) for request ownership, rendering, and repository-access constraints.

@@ -4,7 +4,7 @@
 
 ## Install and open a repository
 
-On macOS, open the DMG and drag oil-git to Applications. On Windows, run the setup executable. The published downloads are test releases; see the release notes for their feature scope. Your computer needs Git, but running the packaged application does not require Node, Rust, or Python. The application detects Git in PATH and common installation locations. The Windows installer can download Microsoft's WebView2 runtime if it is missing.
+On macOS, open the DMG and drag oil-git to Applications. On Windows, run the setup executable. Check the release tag and notes for the package’s feature scope. Your computer needs Git, but running the packaged application does not require Node, Rust, or Python. The application detects Git in PATH and common installation locations. The Windows installer can download Microsoft's WebView2 runtime if it is missing.
 
 Use the project button or `⌘ O` / `Ctrl O` to select a repository. Selecting a subdirectory opens its enclosing repository. Recent projects are stored locally, and the last project is restored on restart. Removing a recent item only removes the application's record. It does not delete files or close the current project.
 
@@ -23,7 +23,7 @@ macOS may request access to Desktop or other protected folders. Respond to the s
 
 Text wraps by default, with original line numbers and aligned rows in side-by-side view. Text diffs are capped at 240 KB and show when output is truncated. UTF-16 BOM text is decoded for comparison; encoding-only changes remain visible. Line attribution is unavailable when decoded line numbers cannot reliably map to Git's original text.
 
-Images support side-by-side, swipe, overlay, and pixel-difference modes. At 100% size, the two versions stack vertically. Added or deleted images show a single preview. Audio and video use the system WebView decoder and do not autoplay. Media reads are limited to 8 MiB per side; images with known dimensions are limited to 16 million pixels. Pixel comparison samples at most 2048 × 2048 pixels and labels this limit. Files that exceed these limits, fail to decode, or have no supported preview show file metadata and a byte comparison of the first 4 KiB.
+Images support side-by-side, swipe, overlay, and pixel-difference modes. In side-by-side mode, selecting 100% size stacks the two versions vertically. Added or deleted images show a single preview. Audio and video use the system WebView decoder and do not autoplay. Media reads are limited to 8 MiB per side; images with known dimensions are limited to 16 million pixels. Pixel comparison samples at most 2048 × 2048 pixels and labels this limit. Decode support depends on the system WebView. Oversized or undecodable media and other binary files show metadata and a byte comparison of the first 4 KiB.
 
 Text conflicts show the actual conflict sections and line numbers. LFS conflicts show object IDs and sizes. Removing textual conflict markers does not mean Git considers the conflict resolved.
 
@@ -46,7 +46,9 @@ oil-git skill
 oil-git skill --path
 ```
 
-`open` sends a request to the desktop application, reusing its existing window. `inspect` reads a real snapshot without opening a window; it does not return full code diffs. Success returns `status=ready` with `data`; failure returns `status=error`, a stable `kind` and `messageKey`, a localized `message`, an original `diagnostic`, and a nonzero exit code. `--lang en` or `--lang zh-CN` selects human-readable CLI text without changing repository data.
+`open` sends a request to the desktop application, reusing its existing window. `inspect` reads a real snapshot without opening a window; it does not return full code diffs. Success returns `status=ready` with `data`; failure returns `status=error`, a stable `kind` and `messageKey`, a localized `message`, an original `diagnostic`, and a nonzero exit code. `--lang en` or `--lang zh-CN` selects CLI and Skill text without changing repository data or the interface language preference.
+
+On each invocation without `--lang`, the CLI reads the first nonempty environment variable in this order: `LC_ALL`, `LC_MESSAGES`, `LANG`. A value beginning with `zh` selects Simplified Chinese; other values or no locale select English. The CLI does not save a language preference.
 
 To invoke the optional Windows launcher without changing system execution policy:
 
@@ -58,7 +60,7 @@ The launcher and Skill are packaged under `Contents/Resources` on macOS and the 
 
 ## Read-only scope
 
-oil-git does not commit, checkout, fetch, merge, or undo changes. Ahead/behind counts describe locally available remote-tracking records. Bare repositories and partial clones that require downloading Git objects are currently unsupported.
+oil-git does not commit, checkout, fetch, merge, or undo changes. Ahead/behind counts describe locally available remote-tracking records. Bare and partial-clone repositories are unsupported, including partial clones whose objects have already been downloaded.
 
 Standard Git LFS uses a bundled read-only filter: it does not run the repository's LFS program, download content, or write to the LFS object store. Pointers and expanded content are compared in their actual staged or unstaged scope. Custom LFS conversions and extensions are unsupported.
 

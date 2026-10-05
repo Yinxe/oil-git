@@ -24,9 +24,13 @@ Update English and Chinese documentation together when behavior changes. The Eng
 
 ## Verification
 
-Run the checks relevant to your change and describe any limits in the pull request. Changes to desktop behavior also need native-window verification; CLI checks alone cannot establish that the interface works. Changes to packaging need checks of the installed program and bundled launcher, not only the build-directory binary. See [Verification](docs/verification.md).
+Link the commit, actual results, and unchecked areas in the PR. Use independent temporary repositories and compare files, the index, refs, configuration, and LFS object storage before and after reads. Do not construct test changes in a personal repository.
 
-GitHub Actions checks macOS ARM64, macOS Intel, and Windows x64. A workflow definition or a local cross-compilation is not evidence that a platform passed; link the actual run when reporting results.
+- **Source**: run the relevant commands in [Development](docs/development.md#checks).
+- **Installed package**: run the packaged program and launcher; check resources, CLI behavior, exit codes, and repository immutability. Exercise the same universal DMG on ARM64 and Intel, and the installed NSIS program on Windows. Record the platform, architecture, and installer SHA-256.
+- **Native window**: interface changes require real interaction on the target platform. Check project opening and restoration, refresh and error ownership, file scopes, history navigation, wrapping and resizing, image comparison and line attribution, language, themes, copy feedback, and reduced motion. CLI checks do not replace these checks.
+
+[Desktop CI](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) covers source and installed CLI checks on all three platforms; it does not cover WebView rendering or native interaction. Configured or skipped jobs and local cross-compilation are not platform passes. Keep acceptance reports, screenshots, and machine-specific logs outside the repository; public docs describe durable behavior and methods.
 
 ## License
 

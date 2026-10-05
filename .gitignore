@@ -15,11 +15,7 @@ skills/dist/
 
 # Local settings and verification evidence
 .DS_Store
-验证材料/
 *.log
-交付/
-reviews/
-验证说明.md
 reports/
 .env
 .env.*

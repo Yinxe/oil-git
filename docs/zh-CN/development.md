@@ -24,7 +24,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D w
 cargo test --manifest-path src-tauri/Cargo.toml --locked --tests
 ```
 
-格式化使用 `npm run format` 和 `cargo fmt --manifest-path src-tauri/Cargo.toml`。测试创建独立临时仓库，覆盖真实 Git 读取、范围区分、冲突、分页、中文路径、请求乱序和只读保证。原生窗口与安装检查另行记录，见[验证说明](verification.md)。
+格式化使用 `npm run format` 和 `cargo fmt --manifest-path src-tauri/Cargo.toml`。测试创建独立临时仓库，覆盖真实 Git 读取、范围区分、冲突、分页、中文路径、请求乱序和只读保证。原生窗口与安装检查另行记录，见[贡献指南](contributing.md#验证)。
 
 开发、测试与构建前自动生成图标和主题 CSS，不提交生成产物。配色位于 `scripts/theme-palettes.json`，文件图标使用锁定的 Material Icon Theme 依赖。
 
@@ -65,12 +65,6 @@ node scripts/ci-install-smoke.mjs --artifact-dir "/安装包所在目录" --repo
 
 脚本将应用复制到独立临时目录，检查后删除。Windows NSIS 会写入安装记录和快捷方式，因此只允许在临时 GitHub Actions runner 执行。Git 写入只用于构造临时夹具，之后逐字节比较读取前后仓库。
 
-## 工程与行为
+## 源码结构
 
-React 渲染提交图、文件列表与详情，Rust 通过按仓库隔离的桌面接口调用标准 Git，无本地 HTTP 服务。文件通知合并后刷新；窗口在前台时每三秒补查，恢复焦点时立即检查。
-
-打开、快照、历史和详情请求有明确归属，历史变化使分页失效。提交详情与默认差异按同一历史版本组合读取，准备好后整体显示。刷新时保留正在阅读的内容，短于 200 毫秒的读取不展示提示，较慢提示只在所属区域出现。
-
-提交缓存有数量与 6 MB 上限，工作区差异最多保留 12 项和 24 MiB。代码与历史只渲染可见行。自动换行测量自然高度，双栏取较高一侧。拖拽更新由动画帧合并，隐藏视图和减少动态效果设置停止展示动画。
-
-用户界面中英文集中在 `src/i18n.tsx`。仓库数据、JSON 字段、错误类型与消息键保持稳定。验证切换语言时不重置仓库、文件和视图。详细工程约束见 [AGENTS.md](../../AGENTS.md)。
+`src/` 包含 React 界面、状态与国际化文案，`src-tauri/src/` 提供只读 Git 接口、文件预览和 LFS 过滤器。配色和文件图标的生成入口位于 `scripts/`。请求归属、渲染和只读访问的完整约束见 [AGENTS.md](../../AGENTS.md)。

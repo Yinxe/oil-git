@@ -8,7 +8,7 @@ metadata:
 
 # oil-git
 
-This Skill requires the local oil-git desktop app, system Git, and permission to run local commands. See the project's [verification guide](https://github.com/oil-oil/oil-git/blob/main/docs/verification.md) for platform validation status.
+This Skill requires the local oil-git desktop app, system Git, and permission to run local commands.
 
 Determine which local project the user means from the current workspace or a path they gave you. Ask only if there are multiple plausible projects and context does not resolve the choice.
 
@@ -45,7 +45,7 @@ Run `oil-git --version` to confirm the command works. If the app is missing or c
 
 5.  State what was actually read and which view was requested. Without a successful read, do not claim that the worktree is clean, a conflict is resolved, or a commit exists.
 
-The CLI follows the system locale on first use. Pass `--lang en` or `--lang zh-CN` before or after the command to choose CLI messages explicitly, for example:
+The CLI reads the locale environment on each invocation and defaults to English when unset; it does not use the saved interface language. Pass `--lang en` or `--lang zh-CN` before or after the command to choose CLI messages explicitly, for example:
 
     oil-git --lang en inspect "/path/to/project" --json
     oil-git inspect "/path/to/project" --json --lang en

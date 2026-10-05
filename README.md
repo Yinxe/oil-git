@@ -38,7 +38,7 @@ The interface supports English and Simplified Chinese. It follows the system lan
 
 ## Install
 
-GitHub Releases currently contain an earlier test build and may not include the bilingual interface and CLI updates in this branch. To try the current changes, use the matching [GitHub Actions build artifact](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) or [build from source](docs/development.md). Git must be installed on the computer. The packaged app does not require Python, Node.js, or Rust at runtime.
+Download the macOS DMG or Windows x64 installer from [GitHub Releases](https://github.com/oil-oil/oil-git/releases). Feature scope follows the release tag and notes. For changes on the default branch, use the matching [CI build artifact](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) or [build from source](docs/development.md). Git must be installed on the computer. The packaged app does not require Python, Node.js, or Rust at runtime.
 
 Open a project from the toolbar or press **⌘ O** on macOS or **Ctrl O** on Windows. Selecting a directory inside a repository opens its owning repository. Use **⌘ R** or **Ctrl R** to refresh.
 
@@ -54,7 +54,7 @@ oil-git skill --path
 oil-git --lang en --help
 ```
 
-Use `--lang en` or `--lang zh-CN` with CLI commands to choose the language explicitly. Without it, CLI messages follow the available system locale. `inspect` reads the local repository and does not open the app. The Skill is included with the package; installing oil-git does not change the host agent's settings. See the [CLI guide](docs/usage.md#cli-and-ai-agents) for launcher paths and integration details.
+Use `--lang en` or `--lang zh-CN` with CLI commands to choose the language explicitly. Without it, each invocation reads the locale environment variables and defaults to English when none are set. This is independent of the saved interface language. `inspect` reads the local repository and does not open the app. The Skill is included with the package; installing oil-git does not change the host agent's settings. See the [CLI guide](docs/usage.md#cli-and-ai-agents) for launcher paths and integration details.
 
 ## Read-only boundary
 
@@ -62,14 +62,13 @@ oil-git does not commit, stage, switch branches, merge, fetch, pull, reset, or u
 
 - Standard Git LFS pointers are read with the app's built-in read-only filter. The app shows object IDs and sizes without downloading file contents. Custom LFS commands and extensions are unsupported.
 - Repository-defined external content filters and converters are not run. If a filter prevents a safe read, the app explains the limitation.
-- Commits are compared with their first parent; an initial commit is shown as added content.
-- Image files can be compared visually. Audio and video files use the system media controls when their data is available. Other binary files show a byte comparison of at most the first 4 KiB per side.
-- Text diffs are limited to 240 KB and explicitly marked when truncated. Media previews have an 8 MiB input limit; large images also have a pixel limit.
 - Bare and partial-clone repositories are not supported. Upstream ahead/behind counts use local tracking records and do not imply a fetch.
+
+See the [usage guide](docs/usage.md#compare-files) for file comparison, media previews, and read limits.
 
 ## Development
 
-oil-git uses Tauri 2, React, TypeScript, and Rust. Rust reads repositories through the system Git executable. The desktop app does not expose a local HTTP server.
+oil-git uses Tauri 2, React, TypeScript, and Rust. Rust reads repositories through the system Git executable. The packaged app does not start a local HTTP server.
 
 ```sh
 npm ci
