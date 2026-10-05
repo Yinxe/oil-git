@@ -34,16 +34,16 @@
 
 ## 下载与开始
 
-当前提供 **未签名的 0.1.0 测试版**，尚未发布正式 Release。
+当前提供 **未签名的 0.1.0 测试版**。
 
-1. 打开 [桌面测试与安装包](https://github.com/oil-oil/oil-git/actions/workflows/build.yml)，选择最近一次通过的运行，在 **Artifacts** 下载对应平台的包。
-   - **macOS Apple Silicon / Intel**：`mac-universal-unsigned-test`。解压后打开 DMG，将 oil-git 拖入 Applications。
-   - **Windows x64**：`windows-x64-unsigned-test`。解压后运行其中以 `setup.exe` 结尾的安装程序。
+1. 下载对应平台的安装包：
+   - **macOS Apple Silicon / Intel**：[通用 DMG](https://github.com/oil-oil/oil-git/releases/download/v0.1.0-test.1/oil-git_0.1.0_universal.dmg)。打开后将 oil-git 拖入 Applications。
+   - **Windows x64**：[安装程序](https://github.com/oil-oil/oil-git/releases/download/v0.1.0-test.1/oil-git_0.1.0_x64-setup.exe)。运行后按提示完成安装。
 2. 电脑需要已有 **Git**。应用启动时会检测；缺失时会提供安装入口和重新检测。运行应用无需 Python、Node 或 Rust。Windows 缺少 WebView2 时，安装器会下载微软运行组件。
 3. 打开项目，或按 **⌘ O / Ctrl O**。选择项目子目录也能识别所属仓库。
 4. 点击左侧文件查看差异，或在“分支”中点击提交节点查看详情。
 
-Actions 安装包和检查报告保留 14 天。各平台的验证范围见 [验证说明](docs/verification.md)；CI 安装检查不代表所有原生窗口体验都已验收。
+[版本说明与校验摘要](https://github.com/oil-oil/oil-git/releases/tag/v0.1.0-test.1)随测试包发布。[Actions](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) 还提供后续提交的测试构建与检查报告，保留 14 天。各平台的验证范围见 [验证说明](docs/verification.md)；CI 安装检查不代表所有原生窗口体验都已验收。
 
 | 快捷键            | 操作               |
 | ----------------- | ------------------ |
