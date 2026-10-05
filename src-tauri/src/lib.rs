@@ -393,6 +393,15 @@ async fn get_diff(
     .await
 }
 #[tauri::command]
+async fn get_line_origin(
+    state: State<'_, AppState>,
+    repo_id: String,
+    request: git::LineOriginRequest,
+) -> Result<git::LineOrigin> {
+    let (git, repo) = context(&state, &repo_id)?;
+    blocking(move || git.line_origin(&repo, &request)).await
+}
+#[tauri::command]
 fn open_git_install(app: tauri::AppHandle) -> Result<()> {
     #[cfg(target_os = "macos")]
     let url = "https://git-scm.com/download/mac";
@@ -508,6 +517,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             check_git,
             recent_repositories,
@@ -520,6 +530,7 @@ pub fn run() {
             get_commit,
             get_commit_view,
             get_diff,
+            get_line_origin,
             open_git_install
         ])
         .run(tauri::generate_context!())

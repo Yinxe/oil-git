@@ -55,6 +55,183 @@ kbd {
   flex-shrink: 0;
   color: var(--muted);
 }
+.copy-button {
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+}
+.copy-button:hover:not(:disabled),
+.copy-button:focus-visible {
+  background: var(--selected-bg);
+  color: var(--text);
+}
+.copy-button[data-status="copied"] {
+  color: var(--added);
+}
+.copy-button[data-status="error"] {
+  color: var(--error-fg);
+}
+.copy-quiet {
+  visibility: hidden;
+}
+.commit-row:hover .copy-quiet,
+.commit-row:focus-within .copy-quiet,
+.graph-viewport:focus-visible .keyboard-row .copy-quiet,
+.copy-quiet[data-status="copied"],
+.copy-quiet[data-status="error"] {
+  visibility: visible;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.file-heading-line,
+.commit-metadata-heading,
+.copy-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.commit-row-author {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.commit-author-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.commit-author-line strong {
+  color: var(--text);
+  font-weight: 500;
+}
+.author-email {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.line-attribution {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  max-height: 190px;
+  overflow: auto;
+  font-size: 11px;
+}
+.line-attribution > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+}
+.line-attribution header strong {
+  font-weight: 500;
+}
+.line-attribution .icon-button {
+  width: 24px;
+  height: 24px;
+}
+.line-attribution .error-text button {
+  margin-left: 8px;
+  color: var(--text);
+}
+.line-author-content {
+  display: grid;
+  gap: 6px;
+}
+.line-author-content > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.line-author-content span,
+.line-author-content time,
+.line-author-content code {
+  color: var(--muted);
+}
+.line-author-content p {
+  overflow-wrap: anywhere;
+}
+.diff-result .code-diff-viewport .line-origin-button {
+  font: inherit;
+  line-height: inherit;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.diff-result .code-diff-viewport .line-origin-button:hover {
+  color: var(--accent);
+  background: var(--selected-bg);
+}
+.file-heading-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.commit-metadata-heading {
+  justify-content: space-between;
+}
+.copy-value {
+  display: inline-flex;
+  margin-right: 8px;
+}
+.commit-references dd > .copy-button {
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.commit-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.commit-select {
+  text-align: left;
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+}
+.commit-select:hover:not(:disabled) {
+  background: transparent;
+}
+.commit-select .commit-title {
+  display: block;
+}
+.commit-row:hover {
+  background: var(--hover);
+}
+.ref-with-copy {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 2px;
+}
+.ref-with-copy .copy-button {
+  width: 20px;
+  height: 20px;
+}
 .graph-viewport {
   overflow: auto;
   flex: 1;
@@ -733,7 +910,7 @@ button {
   overflow-wrap: anywhere;
   flex: 1;
 }
-.details-header .icon-button {
+.details-header .icon-button:not(.copy-button) {
   margin-top: -3px;
   margin-right: -5px;
   width: 27px;
@@ -840,8 +1017,8 @@ button {
 .diff-top {
   padding: 14px 20px 11px;
   display: flex;
-  flex-direction: column;
-  gap: 11px;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 .diff-tabs {
@@ -869,6 +1046,8 @@ button {
   box-shadow: 0 1px 3px #0002;
 }
 .diff-path {
+  flex: 1;
+  min-width: 0;
   font: 12px var(--mono);
   overflow-wrap: anywhere;
   color: var(--muted);

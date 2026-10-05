@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Icon } from "./Icon";
+import { CopyButton } from "./CopyButton";
+import type { DiffOrigin } from "./types";
 import { DiffView } from "./DiffView";
 import type { FileState, Diff, GitError } from "./types";
 import type { WorkingFile } from "./useWorkingCopy";
@@ -280,6 +282,8 @@ export function SourceEditor({
   retry,
   loading = false,
   requestKey,
+  origin,
+  active = true,
 }: {
   files: FileState[];
   file: WorkingFile | null;
@@ -288,6 +292,8 @@ export function SourceEditor({
   retry: () => void;
   loading?: boolean;
   requestKey?: string;
+  origin?: DiffOrigin;
+  active?: boolean;
 }) {
   const [preferSplit, setPreferSplit] = useState(true),
     [wide, setWide] = useState(false);
@@ -320,27 +326,33 @@ export function SourceEditor({
         <>
           <header className="editor-heading">
             <div>
-              <strong title={file.path}>{file.path.split("/").pop()}</strong>
+              <div className="file-heading-line">
+                <strong title={file.path}>{file.path.split("/").pop()}</strong>
+                <CopyButton text={file.path} label="复制文件路径" />
+              </div>
               <span>{captions[file.mode]}</span>
             </div>
-            {!selected?.conflict && !diff?.lfs && (
-              <div className="diff-tabs" aria-label="差异展示方式">
-                <button
-                  aria-pressed={wide && preferSplit}
-                  disabled={!wide}
-                  title={!wide ? "加宽窗口后可以左右对照" : undefined}
-                  onClick={() => setPreferSplit(true)}
-                >
-                  左右对照
-                </button>
-                <button
-                  aria-pressed={!wide || !preferSplit}
-                  onClick={() => setPreferSplit(false)}
-                >
-                  统一差异
-                </button>
-              </div>
-            )}
+            {!selected?.conflict &&
+              !diff?.lfs &&
+              !diff?.preview &&
+              !diff?.binary && (
+                <div className="diff-tabs" aria-label="差异展示方式">
+                  <button
+                    aria-pressed={wide && preferSplit}
+                    disabled={!wide}
+                    title={!wide ? "加宽窗口后可以左右对照" : undefined}
+                    onClick={() => setPreferSplit(true)}
+                  >
+                    左右对照
+                  </button>
+                  <button
+                    aria-pressed={!wide || !preferSplit}
+                    onClick={() => setPreferSplit(false)}
+                  >
+                    统一差异
+                  </button>
+                </div>
+              )}
           </header>
           {error && (
             <div className="history-error" role="status">
@@ -360,6 +372,8 @@ export function SourceEditor({
                 data={diff}
                 layout={wide && preferSplit ? "split" : "unified"}
                 labels={labels}
+                origin={origin}
+                active={active}
               />
             ) : null}
           </div>

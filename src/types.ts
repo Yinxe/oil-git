@@ -43,6 +43,9 @@ export type Commit = {
   hash: string;
   parents: string[];
   author: string;
+  authorEmail?: string;
+  committer?: string;
+  committerEmail?: string;
   date: string;
   subject: string;
 };
@@ -59,6 +62,22 @@ export type CommitFile = {
 };
 export type CommitDetail = Commit & { files: CommitFile[]; comparison: string };
 export type ConflictLine = { line: number; text: string };
+export type PreviewSide = {
+  size: number;
+  mime: string;
+  kind: "image" | "audio" | "video" | "binary";
+  dataUrl: string | null;
+  width: number | null;
+  height: number | null;
+  hex: string;
+  hexTruncated: boolean;
+  note: string | null;
+};
+export type FilePreview = {
+  before: PreviewSide | null;
+  after: PreviewSide | null;
+  conflict: boolean;
+};
 export type Diff = {
   patch: string;
   lfs?: null | {
@@ -70,6 +89,8 @@ export type Diff = {
   };
   truncated: boolean;
   binary: boolean;
+  preview?: FilePreview;
+  encoding?: string;
   note: string | null;
   conflict: null | {
     kind: string;
@@ -89,3 +110,21 @@ export type Selection =
   | { kind: "commit"; hash: string }
   | null;
 export type DiffMode = "unstaged" | "staged" | "conflict" | "commit";
+export type DiffOrigin = {
+  repoId: string;
+  path: string;
+  mode: DiffMode;
+  commit?: string;
+  historyRevision?: string;
+  changesRevision?: string;
+};
+export type LineOrigin = {
+  hash: string | null;
+  author: string;
+  email: string;
+  timestamp: number | null;
+  subject: string;
+  originalLine: number;
+  line: number;
+  path: string;
+};

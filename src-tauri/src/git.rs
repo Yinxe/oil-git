@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+mod file_preview;
+pub use file_preview::FilePreview;
+mod attribution;
+pub use attribution::{LineOrigin, LineOriginRequest};
 use std::{
     collections::HashSet,
     ffi::OsStr,
@@ -348,6 +352,20 @@ impl Git {
         allow_failure: bool,
         input: Option<&[u8]>,
     ) -> Result<Output> {
+        self.run_with_options(repo, args, cap, allow_failure, input, false)
+    }
+    fn run_prefix(&self, repo: &Path, args: &[&str], cap: usize) -> Result<Output> {
+        self.run_with_options(repo, args, cap, true, None, true)
+    }
+    fn run_with_options(
+        &self,
+        repo: &Path,
+        args: &[&str],
+        cap: usize,
+        allow_failure: bool,
+        input: Option<&[u8]>,
+        prefix_only: bool,
+    ) -> Result<Output> {
         let process_command = self.helper_command(crate::lfs::FILTER_PROCESS_COMMAND)?;
         let clean_command = self.helper_command(crate::lfs::CLEAN_COMMAND)?;
         let mut command = Command::new(&self.binary);
@@ -414,7 +432,17 @@ impl Git {
         }
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
-        let out = thread::spawn(move || drain(stdout, cap));
+        let out = thread::spawn(move || -> std::io::Result<(Vec<u8>, bool)> {
+            if prefix_only {
+                let mut bytes = Vec::new();
+                stdout.take((cap + 1) as u64).read_to_end(&mut bytes)?;
+                let truncated = bytes.len() > cap;
+                bytes.truncate(cap);
+                Ok((bytes, truncated))
+            } else {
+                Ok(drain(stdout, cap))
+            }
+        });
         let err = thread::spawn(move || drain(stderr, 32_000));
         let input_writer = input.map(|input| {
             let mut stdin = child.stdin.take().unwrap();
@@ -464,7 +492,7 @@ impl Git {
         };
         let (bytes, truncated) = out
             .join()
-            .map_err(|_| Error::new("read", "Git 输出读取失败"))?;
+            .map_err(|_| Error::new("read", "Git 输出读取失败"))??;
         let (stderr, _) = err
             .join()
             .map_err(|_| Error::new("read", "Git 错误读取失败"))?;
@@ -1712,7 +1740,7 @@ impl Git {
             "--date-order",
             "-101",
             &skip,
-            "--format=%H%x00%P%x00%an%x00%aI%x00%s",
+            "--format=%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%s",
         ];
         if reference == "all" {
             args.extend(["--branches", "--remotes", "--tags"]);
@@ -1794,7 +1822,12 @@ impl Git {
         Self::validate_commit_id(value)?;
         let commit = parse_commit(&self.text(
             repo,
-            &["show", "-s", "--format=%H%x00%P%x00%an%x00%aI%x00%s", value],
+            &[
+                "show",
+                "-s",
+                "--format=%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%s",
+                value,
+            ],
             false,
         )?)
         .ok_or_else(|| Error::new("read", "提交内容读取失败。"))?;
@@ -1892,6 +1925,8 @@ impl Git {
             note: None,
             conflict: None,
             lfs: None,
+            preview: None,
+            encoding: None,
         };
         diff.binary = is_binary_patch(&diff.patch);
         if diff.patch.is_empty() {
@@ -1920,6 +1955,16 @@ impl Git {
             }
             Err(error) => return Err(error),
         };
+        if diff.lfs.is_none() && diff.note.is_none() {
+            let before = match detail.commit.parents.first() {
+                Some(parent) => {
+                    self.tree_blob(repo, parent, file.old_path.as_deref().unwrap_or(path))?
+                }
+                None => None,
+            };
+            let after = self.tree_blob(repo, &detail.commit.hash, path)?;
+            self.enrich_blob_diff(repo, path, before, after, &mut diff)?;
+        }
         Ok(diff)
     }
     pub fn diff(&self, repo: &Path, mode: &str, path: &str, commit: Option<&str>) -> Result<Diff> {
@@ -1970,6 +2015,8 @@ impl Git {
             note: None,
             conflict: None,
             lfs: None,
+            preview: None,
+            encoding: None,
         };
         let mut owned_paths = vec![literal];
         let output = if ["staged", "unstaged", "conflict"].contains(&mode) {
@@ -2013,6 +2060,10 @@ impl Git {
                 }
                 if bytes.contains(&0) {
                     result.binary = true;
+                    if result.lfs.is_none() {
+                        result.truncated = false;
+                        self.enrich_worktree_diff(repo, path, None, &mut result)?;
+                    }
                     return Ok(result);
                 }
                 let content = String::from_utf8_lossy(&bytes);
@@ -2030,6 +2081,9 @@ impl Git {
                     result.truncated = true;
                     result.patch = truncate_utf8(&result.patch, DIFF_LIMIT);
                 }
+                if result.lfs.is_none() {
+                    self.enrich_worktree_diff(repo, path, None, &mut result)?;
+                }
                 return Ok(result);
             }
             if let Some(old) = &file.old_path {
@@ -2046,13 +2100,35 @@ impl Git {
             if mode != "conflict" {
                 result.lfs = self.workspace_lfs_diff(repo, mode, &file)?;
             }
+            result.patch = String::from_utf8_lossy(&output.bytes).into();
+            result.binary = is_binary_patch(&result.patch);
+            result.truncated |= output.truncated;
+            if result.lfs.is_none() {
+                if mode == "conflict" && file.conflict {
+                    let before = self.index_stage_blob(repo, path, "2")?;
+                    let after = self.index_stage_blob(repo, path, "3")?;
+                    self.enrich_blob_diff(repo, path, before, after, &mut result)?;
+                } else if mode == "staged" {
+                    let has_head = self
+                        .run(repo, &["rev-parse", "--verify", "HEAD"], 256, true)?
+                        .ok;
+                    let before = if has_head {
+                        self.tree_blob(repo, "HEAD", file.old_path.as_deref().unwrap_or(path))?
+                    } else {
+                        None
+                    };
+                    let after = self.index_blob(repo, path)?;
+                    self.enrich_blob_diff(repo, path, before, after, &mut result)?;
+                } else {
+                    let before = self.index_blob(repo, path)?;
+                    self.enrich_worktree_diff(repo, path, before, &mut result)?;
+                }
+            }
             output
         } else {
             return Err(Error::new("invalid", "差异类型无效。"));
         };
-        result.patch = String::from_utf8_lossy(&output.bytes).into();
-        result.binary = is_binary_patch(&result.patch);
-        result.truncated |= output.truncated;
+        let _ = output;
         if result.patch.is_empty() {
             result.note = Some("当前比较范围没有差异。".into());
         }
@@ -2338,16 +2414,19 @@ fn truncate_utf8(text: &str, cap: usize) -> String {
     text[..end].into()
 }
 fn parse_commit(raw: &str) -> Option<Commit> {
-    let p: Vec<_> = raw.splitn(5, '\0').collect();
-    if p.len() != 5 {
+    let p: Vec<_> = raw.splitn(8, '\0').collect();
+    if p.len() != 8 {
         return None;
     }
     Some(Commit {
         hash: p[0].into(),
         parents: p[1].split_whitespace().map(str::to_owned).collect(),
         author: p[2].into(),
-        date: p[3].into(),
-        subject: p[4].into(),
+        author_email: p[3].into(),
+        committer: p[4].into(),
+        committer_email: p[5].into(),
+        date: p[6].into(),
+        subject: p[7].into(),
     })
 }
 
@@ -2404,10 +2483,14 @@ pub struct Snapshot {
     pub stashes: Vec<Stash>,
 }
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Commit {
     pub hash: String,
     pub parents: Vec<String>,
     pub author: String,
+    pub author_email: String,
+    pub committer: String,
+    pub committer_email: String,
     pub date: String,
     pub subject: String,
 }
@@ -2448,6 +2531,10 @@ pub struct Diff {
     pub note: Option<String>,
     pub conflict: Option<Conflict>,
     pub lfs: Option<LfsDiff>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview: Option<FilePreview>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<String>,
 }
 #[derive(Clone)]
 struct GitBlob {

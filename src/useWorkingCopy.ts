@@ -29,7 +29,8 @@ export function useWorkingCopy(project: Project | null, active: boolean) {
     data: Diff | null;
     error: GitError | null;
     loading: boolean;
-  }>({ key: "", data: null, error: null, loading: false });
+    revision: string;
+  }>({ key: "", data: null, error: null, loading: false, revision: "" });
   const [retry, setRetry] = useState(0);
   const cache = useRef(new Map<string, Diff>());
   const files = project?.snapshot.files ?? [];
@@ -70,7 +71,13 @@ export function useWorkingCopy(project: Project | null, active: boolean) {
     if (!active || !project || !file) return;
     const hit = cache.current.get(versionKey);
     if (hit) {
-      setResult({ key, data: hit, error: null, loading: false });
+      setResult({
+        key,
+        data: hit,
+        error: null,
+        loading: false,
+        revision: project.snapshot.changesRevision,
+      });
       return;
     }
     let live = true;
@@ -79,6 +86,7 @@ export function useWorkingCopy(project: Project | null, active: boolean) {
       data: old.key === key ? old.data : null,
       error: null,
       loading: true,
+      revision: old.key === key ? old.revision : "",
     }));
     request<Diff>("get_diff", {
       repoId: project.repoId,
@@ -89,10 +97,25 @@ export function useWorkingCopy(project: Project | null, active: boolean) {
       .then((data) => {
         if (live) {
           cache.current.set(versionKey, data);
-          // 差异单次最多 240 KB；只保留最近 12 个比较范围，内存不会随文件数量增长。
-          if (cache.current.size > 12)
-            cache.current.delete(cache.current.keys().next().value!);
-          setResult({ key, data, error: null, loading: false });
+          // 媒体预览也计入容量；大结果可以显示，但不占据整个缓存。
+          let bytes = 0;
+          const weights = [...cache.current].map(([cacheKey, value]) => {
+            const weight = JSON.stringify(value).length * 2;
+            bytes += weight;
+            return [cacheKey, weight] as const;
+          });
+          for (const [cacheKey, weight] of weights) {
+            if (cache.current.size <= 12 && bytes <= 24 * 1024 * 1024) break;
+            cache.current.delete(cacheKey);
+            bytes -= weight;
+          }
+          setResult({
+            key,
+            data,
+            error: null,
+            loading: false,
+            revision: project.snapshot.changesRevision,
+          });
         }
       })
       .catch((e) => {
@@ -102,6 +125,7 @@ export function useWorkingCopy(project: Project | null, active: boolean) {
             data: old.key === key ? old.data : null,
             error: errorOf(e),
             loading: false,
+            revision: old.key === key ? old.revision : "",
           }));
       });
     return () => {
@@ -119,6 +143,11 @@ export function useWorkingCopy(project: Project | null, active: boolean) {
     file,
     requestKey: versionKey,
     diff: cached ?? (result.key === key ? result.data : null),
+    diffRevision: cached
+      ? project?.snapshot.changesRevision
+      : result.key === key
+        ? result.revision
+        : undefined,
     error: result.key === key ? result.error : null,
     loading: !cached && result.key === key && result.loading,
     choose: (value: WorkingFile) => {

@@ -21,6 +21,7 @@ type PatchCodeDiffProps = {
   labels?: [string, string];
   includeMetadata?: boolean;
   ariaLabel?: string;
+  onLineSelect?: (side: "before" | "after", line: number) => void;
 };
 type RawCodeDiffProps = { rawLines: ConflictLine[]; ariaLabel: string };
 
@@ -112,6 +113,20 @@ export function CodeDiff(props: PatchCodeDiffProps | RawCodeDiffProps) {
   const includeMetadata =
     "includeMetadata" in props ? (props.includeMetadata ?? false) : false;
   const ariaLabel = "ariaLabel" in props ? props.ariaLabel : undefined;
+  const onLineSelect = "onLineSelect" in props ? props.onLineSelect : undefined;
+  const lineNumber = (value: number | string, side: "before" | "after") =>
+    onLineSelect && typeof value === "number" && value > 0 ? (
+      <button
+        className="line-number line-origin-button"
+        title={`查看第 ${value} 行最后修改者`}
+        aria-label={`${side === "before" ? "变更前" : "变更后"}第 ${value} 行归属`}
+        onClick={() => onLineSelect(side, value)}
+      >
+        {value}
+      </button>
+    ) : (
+      <span className="line-number">{value}</span>
+    );
   const renderLayout = rawLines ? "unified" : layout;
   const rows = useMemo<CodeRow[]>(
     () => rawLines ?? patchRows(patch),
@@ -541,10 +556,12 @@ export function CodeDiff(props: PatchCodeDiffProps | RawCodeDiffProps) {
                   data-virtual-side={0}
                   className={`code-row code-line-measure ${kind}`}
                 >
-                  <span className="line-number">
-                    {isPatch ? row.a : row.line}
-                  </span>
-                  {isPatch && <span className="line-number">{row.b}</span>}
+                  {isPatch ? (
+                    lineNumber(row.a, "before")
+                  ) : (
+                    <span className="line-number">{row.line}</span>
+                  )}
+                  {isPatch && lineNumber(row.b, "after")}
                   <span className="code-text">{row.text}</span>
                 </div>
               </div>
@@ -591,9 +608,10 @@ export function CodeDiff(props: PatchCodeDiffProps | RawCodeDiffProps) {
                         (row?.kind ?? (pair.meta ? "meta" : "spacer"))
                       }
                     >
-                      <span className="line-number">
-                        {row ? (side === 0 ? row.a : row.b) : ""}
-                      </span>
+                      {lineNumber(
+                        row ? (side === 0 ? row.a : row.b) : "",
+                        side === 0 ? "before" : "after",
+                      )}
                       <span className="code-text">
                         {pair.meta ?? (row ? row.text.slice(1) : "")}
                       </span>

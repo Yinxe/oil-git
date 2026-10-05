@@ -1,5 +1,8 @@
-import type { Diff, ConflictLine } from "./types";
+import { useEffect, useState } from "react";
+import type { Diff, ConflictLine, DiffOrigin } from "./types";
+import { LineAttribution } from "./LineAttribution";
 import { CodeDiff, CodeLines } from "./CodeDiff";
+import { FilePreviewDiff } from "./FilePreview";
 import "./lfs-diff.css";
 export { patchRows } from "./patch";
 
@@ -76,16 +79,36 @@ export function DiffView({
   data,
   layout = "unified",
   labels,
+  origin,
+  active = true,
 }: {
   data: Diff;
   layout?: "split" | "unified";
   labels?: [string, string];
+  origin?: DiffOrigin;
+  active?: boolean;
 }) {
+  const [line, setLine] = useState<{
+    side: "before" | "after";
+    line: number;
+  } | null>(null);
+  const originKey = JSON.stringify(origin);
+  useEffect(() => {
+    setLine(null);
+  }, [originKey, data.patch]);
+  const selectLine =
+    origin && (!data.encoding || data.encoding === "UTF-8")
+      ? (side: "before" | "after", number: number) =>
+          setLine({ side, line: number })
+      : undefined;
   return (
     <div
       className={
         "diff-result " +
-        (!data.conflict && !data.lfs && !(data.note && data.patch)
+        (!data.conflict &&
+        !data.lfs &&
+        !data.preview &&
+        !(data.note && data.patch)
           ? "virtual-diff"
           : "")
       }
@@ -98,6 +121,15 @@ export function DiffView({
               ? ["当前分支", "合入分支"]
               : (labels ?? ["变更前", "变更后"])
           }
+        />
+      ) : data.preview ? (
+        <FilePreviewDiff
+          preview={data.preview}
+          patch={data.patch}
+          note={data.note}
+          encoding={data.encoding}
+          active={active}
+          labels={data.preview.conflict ? ["当前分支", "合入分支"] : labels}
         />
       ) : data.conflict ? (
         <>
@@ -145,7 +177,25 @@ export function DiffView({
           </details>
         </section>
       ) : data.patch ? (
-        <CodeDiff patch={data.patch} layout={layout} labels={labels} />
+        <>
+          {origin && line && (
+            <LineAttribution
+              origin={origin}
+              selection={line}
+              onClose={() => setLine(null)}
+              active={active}
+            />
+          )}
+          {data.encoding && (
+            <p className="encoding-note">{data.encoding} · 按文本比较</p>
+          )}
+          <CodeDiff
+            patch={data.patch}
+            layout={layout}
+            labels={labels}
+            onLineSelect={selectLine}
+          />
+        </>
       ) : (
         <p className="inline-note">{data.note || "当前比较范围没有差异。"}</p>
       )}

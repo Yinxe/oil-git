@@ -7,6 +7,7 @@ import { HistoryGraph } from "./HistoryGraph";
 import { Details, type DetailState } from "./Details";
 import { usePaneLayout } from "./usePaneLayout";
 import { Icon } from "./Icon";
+import { CopyButton } from "./CopyButton";
 import { Dropdown, type MenuOption } from "./Dropdown";
 import type { Selection } from "./types";
 import { useTheme, THEMES, type Theme } from "./theme";
@@ -263,6 +264,9 @@ export default function App() {
               <Icon name="branch" size={16} />
               {s.branch || "分离 HEAD"}
             </span>
+            {s.branch && (
+              <CopyButton text={s.branch} label="复制当前分支名称" />
+            )}
             <span className="toolbar-spacer" data-tauri-drag-region />
             {s.worktrees.length > 1 && (
               <Dropdown
@@ -495,6 +499,17 @@ export default function App() {
                 loading={working.loading}
                 requestKey={working.requestKey}
                 retry={working.retry}
+                active={view === "source"}
+                origin={
+                  repo.project && working.file
+                    ? {
+                        repoId: repo.project.repoId,
+                        path: working.file.path,
+                        mode: working.file.mode,
+                        changesRevision: working.diffRevision,
+                      }
+                    : undefined
+                }
               />
             </div>
             <div

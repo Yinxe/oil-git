@@ -5,6 +5,7 @@ import { FileIcon } from "./FileIcon";
 import { ReadStatus } from "./ReadStatus";
 import { useCommitView } from "./useCommitView";
 import { CommitMetadata } from "./CommitMetadata";
+import { CopyButton } from "./CopyButton";
 import { useCommitMotion } from "./useCommitMotion";
 import type { GitError, Project, Selection } from "./types";
 
@@ -67,6 +68,9 @@ export function Details({
                 ? "临时保存"
                 : (data?.detail.subject ?? subject ?? "无法读取提交")}
             </h2>
+            {!stash && data && (
+              <CopyButton text={data.detail.subject} label="复制提交标题" />
+            )}
             <button
               className="icon-button"
               onClick={onClose}
@@ -89,6 +93,16 @@ export function Details({
             <>
               {data && (
                 <div className="commit-context">
+                  <p className="commit-author-line">
+                    <strong>{data.detail.author}</strong>
+                    <span>
+                      {new Date(data.detail.date).toLocaleDateString("zh-CN")}
+                    </span>
+                    <CopyButton
+                      text={`${data.detail.author}${data.detail.authorEmail ? ` <${data.detail.authorEmail}>` : ""}`}
+                      label="复制提交作者"
+                    />
+                  </p>
                   <p>
                     {data.detail.comparison} · {data.detail.files.length} 个文件
                   </p>
@@ -162,9 +176,22 @@ export function Details({
                         <span className="diff-path" title={data.filePath}>
                           {data.filePath}
                         </span>
+                        <CopyButton text={data.filePath} label="复制文件路径" />
                       </div>
                       <div className="diff-scroll">
-                        {data.diff && <DiffView data={data.diff} />}
+                        {data.diff && (
+                          <DiffView
+                            data={data.diff}
+                            active={shown}
+                            origin={{
+                              repoId: project.repoId,
+                              path: data.filePath,
+                              mode: "commit",
+                              commit: data.detail.hash,
+                              historyRevision: data.revision,
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
                   )}
