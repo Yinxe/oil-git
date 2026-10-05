@@ -34,6 +34,8 @@ const run = (command, args, options = {}) =>
     stdio: ["ignore", "pipe", "pipe"],
     ...options,
   }).trim();
+// PowerShell emits CRLF for lines; compare Skill text without changing other bytes.
+const normalizeLineEndings = (text) => text.replaceAll("\r\n", "\n");
 function filesUnder(root) {
   return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(root, entry.name);
@@ -150,9 +152,17 @@ try {
         fs.realpathSync(skillPath),
         fs.realpathSync(path.join(resources, "skills", "oil-git", file)),
       );
-      const content = fs.readFileSync(skillPath, "utf8").trim();
-      assert.equal(cli(["skill", "--lang", locale]), content);
-      assert.equal(launcher(["--lang", locale, "skill"]), content);
+      const content = normalizeLineEndings(
+        fs.readFileSync(skillPath, "utf8"),
+      ).trim();
+      assert.equal(
+        normalizeLineEndings(cli(["skill", "--lang", locale])),
+        content,
+      );
+      assert.equal(
+        normalizeLineEndings(launcher(["--lang", locale, "skill"])),
+        content,
+      );
     }
     assert.ok(fs.existsSync(path.join(resources, "LICENSE")));
     assert.ok(fs.existsSync(path.join(resources, "THIRD-PARTY-NOTICES.md")));
