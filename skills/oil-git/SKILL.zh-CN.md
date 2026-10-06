@@ -20,7 +20,7 @@ macOS 安装包提供以下启动器：
 
     /Applications/oil-git.app/Contents/Resources/bin/oil-git
 
-若应用安装在其他位置，使用对应 `.app` 中的相同相对路径。Windows 使用应用安装目录中的 `oil-git.exe`。可选 PowerShell 启动器为 `bin/oil-git.ps1`，参数相同；不要为运行它修改用户或系统执行策略。
+若应用安装在其他位置，使用对应 `.app` 中的相同相对路径。Windows 使用应用安装目录中的 `oil-git.exe`。可选 PowerShell 启动器为 `bin/oil-git.ps1`，参数相同；不要为运行它修改用户或系统执行策略。Linux 的 deb 与 rpm 会安装 `oil-git` 命令本身，独立 AppImage 则以单个文件运行。
 
 运行 `oil-git --version` 确认命令可用。若找不到应用或无法启动，说明缺少项后停止。安装应用或修改 Agent 宿主的 Skill 配置需要用户授权。
 

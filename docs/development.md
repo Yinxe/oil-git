@@ -43,27 +43,35 @@ Build a Windows x64 installer on Windows:
 npm run package -- --target x86_64-pc-windows-msvc --bundles nsis
 ```
 
+Build Linux packages on Linux:
+
+```sh
+npm run package -- --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
+```
+
+Linux builds need the Tauri prerequisites for Debian and Ubuntu: `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, and `librsvg2-dev`. The deb and rpm packages install the program as `oil-git` with its resources under `/usr/lib/oil-git`; the AppImage keeps the same layout inside its own bundle. Feeding the rpm to `rpmbuild` and the AppImage to a FUSE mount are not required: the packages are written directly and the AppImage can also run with `--appimage-extract-and-run` where FUSE is unavailable.
+
 Outputs are under the selected Cargo target's `release/bundle` directory. Both languages, the Agent Skill, launchers, and license notices ship with the application. Published release assets are snapshots of their release commits, not automatically updated by subsequent source changes.
 
 ## Continuous integration
 
 [Desktop CI](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) runs on pushes, pull requests, and manual dispatch:
 
-| Stage         | Scope                                                                                                                                                                                                                              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Checks        | Native macOS ARM64, macOS Intel, and Windows x64 runners: formatting, frontend tests/build, Rust Clippy, and real-Git integration tests                                                                                            |
-| Package       | Universal macOS DMG and Windows x64 NSIS installer, only after all source checks pass                                                                                                                                              |
-| Installed CLI | Install the universal DMG on both macOS architectures and the NSIS package on Windows; run the installed binary and launcher and verify bundled resources, CLI snapshots, Unicode paths, LFS behavior, and repository immutability |
+| Stage         | Scope                                                                                                                                                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checks        | Native macOS ARM64, macOS Intel, Windows x64, and Ubuntu x64 runners: formatting, frontend tests/build, Rust Clippy, and real-Git integration tests                                                                                                            |
+| Package       | Universal macOS DMG, Windows x64 NSIS installer, and Linux deb, rpm, and AppImage packages, only after all source checks pass                                                                                                                                  |
+| Installed CLI | Install the universal DMG on both macOS architectures, the NSIS package on Windows, and unpack the Linux packages; run the installed binary and launcher and verify bundled resources, CLI snapshots, Unicode paths, LFS behavior, and repository immutability |
 
 Artifacts and per-platform JSON reports are retained for 14 days. This workflow does not publish a Release. A newer run cancels an unfinished run on the same ref. Use the actual run result for a specific commit when reporting CI status.
 
-The macOS installer check can also run locally:
+The macOS and Linux installer checks can also run locally:
 
 ```sh
 node scripts/ci-install-smoke.mjs --artifact-dir "/path/to/installer-directory" --report reports/installed.json
 ```
 
-It copies the application into an independent temporary directory and removes that directory afterwards. Windows NSIS changes installation records and shortcuts, so this check is restricted to disposable GitHub Actions runners. Fixture creation is the only phase that writes Git data; subsequent checks compare the repository bytes before and after reads.
+It copies the application into an independent temporary directory and removes that directory afterwards. Linux unpacks the deb, rpm, and AppImage into that directory instead of installing them, so it needs no root access and no FUSE mount. Windows NSIS changes installation records and shortcuts, so this check is restricted to disposable GitHub Actions runners. Fixture creation is the only phase that writes Git data; subsequent checks compare the repository bytes before and after reads.
 
 ## Source layout
 

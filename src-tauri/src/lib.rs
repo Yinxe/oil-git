@@ -171,34 +171,31 @@ fn invalid_language_payload(language: CliLanguage) -> serde_json::Value {
     })
 }
 fn installed_skill_path(language: CliLanguage) -> PathBuf {
+    let file = if language == CliLanguage::Chinese {
+        "SKILL.zh-CN.md"
+    } else {
+        "SKILL.md"
+    };
+    let relative = Path::new("skills/oil-git").join(file);
     if let Ok(exe) = std::env::current_exe() {
-        #[cfg(target_os = "macos")]
-        let resource = exe.parent().and_then(|p| p.parent()).map(|p| {
-            p.join(if language == CliLanguage::Chinese {
-                "Resources/skills/oil-git/SKILL.zh-CN.md"
-            } else {
-                "Resources/skills/oil-git/SKILL.md"
-            })
-        });
-        #[cfg(not(target_os = "macos"))]
-        let resource = exe.parent().map(|p| {
-            p.join(if language == CliLanguage::Chinese {
-                "skills/oil-git/SKILL.zh-CN.md"
-            } else {
-                "skills/oil-git/SKILL.md"
-            })
-        });
-        if let Some(path) = resource {
-            if path.is_file() {
-                return path;
+        if let Some(dir) = exe.parent() {
+            // Resources sit beside the executable on Windows, under `Resources` for a macOS
+            // `.app`, and under `lib/oil-git` for the Linux deb, rpm, and AppImage layouts.
+            for root in [
+                dir.to_path_buf(),
+                dir.join("../Resources"),
+                dir.join("../lib/oil-git"),
+            ] {
+                let path = root.join(&relative);
+                if path.is_file() {
+                    return path;
+                }
             }
         }
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(if language == CliLanguage::Chinese {
-        "../skills/oil-git/SKILL.zh-CN.md"
-    } else {
-        "../skills/oil-git/SKILL.md"
-    })
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../skills/oil-git")
+        .join(file)
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Recent {

@@ -56,19 +56,28 @@ function check(name, action) {
   action();
   report.checks.push(name);
 }
+function singleArtifact(files, extension) {
+  const matches = files.filter((file) => file.endsWith(extension));
+  assert.equal(
+    matches.length,
+    1,
+    `Provide exactly one ${extension} artifact for the current platform`,
+  );
+  return matches[0];
+}
 
 let temporary;
 let mounted = false;
 let mountPoint;
 try {
-  assert.ok(["darwin", "win32"].includes(process.platform));
+  assert.ok(["darwin", "win32", "linux"].includes(process.platform));
   temporary = fs.mkdtempSync(path.join(os.tmpdir(), "oil-git-installed-"));
-  const candidates = filesUnder(path.resolve(values["artifact-dir"])).filter(
-    (file) =>
-      process.platform === "darwin"
-        ? file.endsWith(".dmg")
-        : file.endsWith("setup.exe"),
-  );
+  const artifacts = filesUnder(path.resolve(values["artifact-dir"]));
+  const candidates = artifacts.filter((file) => {
+    if (process.platform === "darwin") return file.endsWith(".dmg");
+    if (process.platform === "win32") return file.endsWith("setup.exe");
+    return file.endsWith(".deb");
+  });
   assert.equal(
     candidates.length,
     1,
@@ -80,6 +89,8 @@ try {
     .digest("hex");
   let executable;
   let resources;
+  let rpmExecutable;
+  let appImageLauncher;
   if (process.platform === "darwin") {
     mountPoint = path.join(temporary, "mount");
     fs.mkdirSync(mountPoint);
@@ -103,6 +114,23 @@ try {
       assert.ok(architectures.includes("arm64"));
       assert.ok(architectures.includes("x86_64"));
     });
+  } else if (process.platform === "linux") {
+    // Unpack the packages instead of installing them: no root, and no installation record changes.
+    const debRoot = path.join(temporary, "deb");
+    run("dpkg-deb", ["--extract", candidates[0], debRoot]);
+    executable = path.join(debRoot, "usr", "bin", "oil-git");
+    resources = path.join(debRoot, "usr", "lib", "oil-git");
+    const rpmRoot = path.join(temporary, "rpm");
+    fs.mkdirSync(rpmRoot);
+    run("bsdtar", ["-xf", singleArtifact(artifacts, ".rpm"), "-C", rpmRoot]);
+    rpmExecutable = path.join(rpmRoot, "usr", "bin", "oil-git");
+    const appImageRoot = path.join(temporary, "appimage");
+    fs.mkdirSync(appImageRoot);
+    const appImage = singleArtifact(artifacts, ".AppImage");
+    fs.chmodSync(appImage, 0o755);
+    // `--appimage-extract` needs no FUSE mount and leaves the system unchanged.
+    run(appImage, ["--appimage-extract"], { cwd: appImageRoot });
+    appImageLauncher = path.join(appImageRoot, "squashfs-root", "AppRun");
   } else {
     assert.equal(
       process.env.GITHUB_ACTIONS,
@@ -125,15 +153,17 @@ try {
     process.platform === "darwin"
       ? (args) =>
           run("/bin/sh", [path.join(resources, "bin", "oil-git"), ...args])
-      : (args) =>
-          run("powershell.exe", [
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            path.join(resources, "bin", "oil-git.ps1"),
-            ...args,
-          ]);
+      : process.platform === "win32"
+        ? (args) =>
+            run("powershell.exe", [
+              "-NoProfile",
+              "-ExecutionPolicy",
+              "Bypass",
+              "-File",
+              path.join(resources, "bin", "oil-git.ps1"),
+              ...args,
+            ])
+        : (args) => run(appImageLauncher, args);
   check("Version and help entry points", () => {
     report.version = cli(["--version"]);
     assert.match(report.version, /^oil-git \d+\.\d+\.\d+/);
@@ -172,6 +202,42 @@ try {
       ),
     );
   });
+  if (process.platform === "linux") {
+    report.artifacts = Object.fromEntries(
+      [".deb", ".rpm", ".AppImage"].map((extension) => {
+        const file = singleArtifact(artifacts, extension);
+        return [
+          path.basename(file),
+          createHash("sha256").update(fs.readFileSync(file)).digest("hex"),
+        ];
+      }),
+    );
+    check(
+      "RPM and AppImage payloads match the installed Debian payload",
+      () => {
+        const expected = fixtureContents(resources);
+        assert.ok(Object.keys(expected).length > 0, "Debian payload is empty");
+        assert.deepEqual(
+          fixtureContents(
+            path.join(rpmExecutable, "..", "..", "lib", "oil-git"),
+          ),
+          expected,
+        );
+        assert.deepEqual(
+          fixtureContents(
+            path.join(appImageLauncher, "..", "usr", "lib", "oil-git"),
+          ),
+          expected,
+        );
+      },
+    );
+    check("RPM payload resolves its own bundled Skill", () => {
+      assert.match(run(rpmExecutable, ["--version"]), /^oil-git \d+\.\d+\.\d+/);
+      const skillPath = run(rpmExecutable, ["skill", "--path", "--lang", "en"]);
+      assert.match(skillPath, /lib\/oil-git\/skills\/oil-git\/SKILL\.md$/);
+      assert.ok(fs.existsSync(skillPath));
+    });
+  }
 
   const repo = path.join(temporary, "项目 with space");
   fs.mkdirSync(repo);

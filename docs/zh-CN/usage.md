@@ -4,7 +4,7 @@
 
 ## 安装与打开
 
-macOS 打开 DMG，将 oil-git 拖入 Applications；Windows 运行 setup.exe。安装包功能范围以对应发布标签和说明为准。电脑需要已有 Git，应用会检测 PATH 和常见安装位置；运行安装后的应用不需要 Node、Rust 或 Python。Windows 缺少 WebView2 时，安装程序可下载微软运行组件。
+macOS 打开 DMG，将 oil-git 拖入 Applications；Windows 运行 setup.exe；Linux 安装 deb 或 rpm 包，或赋予 AppImage 可执行权限后直接运行。安装包功能范围以对应发布标签和说明为准。电脑需要已有 Git，应用会检测 PATH 和常见安装位置；运行安装后的应用不需要 Node、Rust 或 Python。Windows 缺少 WebView2 时，安装程序可下载微软运行组件。
 
 点击项目按钮或使用 `⌘ O` / `Ctrl O` 选择仓库。选择子目录也能识别所属仓库。最近项目保存在本机，重启时恢复上次项目；移除最近记录不会删除文件或关闭当前项目。
 
@@ -35,7 +35,7 @@ macOS 首次访问桌面等受保护目录时可能询问权限。处理系统�
 
 ## CLI 与 AI Agent
 
-macOS 可直接使用随包 `bin/oil-git` 或放入 PATH；应用安装在其他位置时，用 `OIL_GIT_APP` 指定完整 `.app` 路径。Windows 使用安装目录的 `oil-git.exe`，或 `bin/oil-git.ps1`。启动器参数相同，带空格的路径需要引号。
+macOS 可直接使用随包 `bin/oil-git` 或放入 PATH；应用安装在其他位置时，用 `OIL_GIT_APP` 指定完整 `.app` 路径。Windows 使用安装目录的 `oil-git.exe`，或 `bin/oil-git.ps1`。Linux 的 deb 与 rpm 会把 `oil-git` 本身安装到 PATH，AppImage 则运行自身的 `AppRun`。启动器参数相同，带空格的路径需要引号。
 
 ```sh
 oil-git open "/项目路径" --view changes
@@ -56,7 +56,7 @@ Windows 可按下面方式使用脚本，无需修改系统执行策略：
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\安装目录\bin\oil-git.ps1" inspect "C:\项目路径" --json
 ```
 
-启动器与 Skill 在 macOS 位于 `Contents/Resources`，Windows 位于安装目录。可将完整 `skills/oil-git` 目录交给 Agent 宿主按其规则安装。安装应用不会修改其他应用的 Skill 设置。
+启动器与 Skill 在 macOS 位于 `Contents/Resources`，Windows 位于安装目录，Linux 位于 `/usr/lib/oil-git`。可将完整 `skills/oil-git` 目录交给 Agent 宿主按其规则安装。安装应用不会修改其他应用的 Skill 设置。
 
 ## 只读范围
 

@@ -4,7 +4,7 @@
 
 ## Install and open a repository
 
-On macOS, open the DMG and drag oil-git to Applications. On Windows, run the setup executable. Check the release tag and notes for the package’s feature scope. Your computer needs Git, but running the packaged application does not require Node, Rust, or Python. The application detects Git in PATH and common installation locations. The Windows installer can download Microsoft's WebView2 runtime if it is missing.
+On macOS, open the DMG and drag oil-git to Applications. On Windows, run the setup executable. On Linux, install the deb or rpm package, or make the AppImage executable and run it directly. Check the release tag and notes for the package’s feature scope. Your computer needs Git, but running the packaged application does not require Node, Rust, or Python. The application detects Git in PATH and common installation locations. The Windows installer can download Microsoft's WebView2 runtime if it is missing.
 
 Use the project button or `⌘ O` / `Ctrl O` to select a repository. Selecting a subdirectory opens its enclosing repository. Recent projects are stored locally, and the last project is restored on restart. Removing a recent item only removes the application's record. It does not delete files or close the current project.
 
@@ -35,7 +35,7 @@ Drag pane dividers, or use arrow keys on a selected divider, to adjust widths. P
 
 ## CLI and AI agents
 
-On macOS, use the bundled `bin/oil-git` launcher directly or put it in your PATH. Set `OIL_GIT_APP` to the full `.app` path when it is installed elsewhere. On Windows, use the installed `oil-git.exe` or `bin/oil-git.ps1`. The launcher accepts the same arguments. Paths containing spaces need quotes.
+On macOS, use the bundled `bin/oil-git` launcher directly or put it in your PATH. Set `OIL_GIT_APP` to the full `.app` path when it is installed elsewhere. On Windows, use the installed `oil-git.exe` or `bin/oil-git.ps1`. On Linux, the deb and rpm packages install `oil-git` itself on the PATH, and an AppImage runs its own `AppRun`. The launcher accepts the same arguments. Paths containing spaces need quotes.
 
 ```sh
 oil-git open "/path/to/repository" --view changes
@@ -56,7 +56,7 @@ To invoke the optional Windows launcher without changing system execution policy
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\path\to\bin\oil-git.ps1" inspect "C:\path\to\repository" --json
 ```
 
-The launcher and Skill are packaged under `Contents/Resources` on macOS and the installation directory on Windows. You can give the complete `skills/oil-git` directory to your agent host for installation according to its rules. Installing oil-git does not change another application's Skill settings.
+The launcher and Skill are packaged under `Contents/Resources` on macOS, the installation directory on Windows, and `/usr/lib/oil-git` on Linux. You can give the complete `skills/oil-git` directory to your agent host for installation according to its rules. Installing oil-git does not change another application's Skill settings.
 
 ## Read-only scope
 

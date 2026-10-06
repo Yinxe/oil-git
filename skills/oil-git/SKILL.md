@@ -20,7 +20,7 @@ On macOS, the app includes this launcher:
 
     /Applications/oil-git.app/Contents/Resources/bin/oil-git
 
-If the app is installed elsewhere, use that app's corresponding path. On Windows, use `oil-git.exe` in the app's installation directory. The optional PowerShell launcher is `bin/oil-git.ps1`; it accepts the same arguments. Do not change a user or machine execution policy to run it.
+If the app is installed elsewhere, use that app's corresponding path. On Windows, use `oil-git.exe` in the app's installation directory. The optional PowerShell launcher is `bin/oil-git.ps1`; it accepts the same arguments. Do not change a user or machine execution policy to run it. On Linux, the deb and rpm packages install `oil-git` itself, and a standalone AppImage runs as that one file.
 
 Run `oil-git --version` to confirm the command works. If the app is missing or cannot start, explain what is missing and stop. Installing the app or changing the agent host's Skill configuration requires the user's authorization.
 

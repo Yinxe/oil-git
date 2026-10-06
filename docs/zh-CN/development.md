@@ -43,27 +43,35 @@ npm run package -- --target universal-apple-darwin --bundles app,dmg
 npm run package -- --target x86_64-pc-windows-msvc --bundles nsis
 ```
 
+在 Linux 构建 deb、rpm 与 AppImage：
+
+```sh
+npm run package -- --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
+```
+
+Linux 构建需要 Debian 与 Ubuntu 的 Tauri 依赖：`libwebkit2gtk-4.1-dev`、`libgtk-3-dev`、`librsvg2-dev`。deb 与 rpm 将程序安装为 `oil-git`，资源位于 `/usr/lib/oil-git`；AppImage 在自身包内使用相同布局。无需额外安装 `rpmbuild`，也无需挂载 FUSE：rpm 由构建过程直接写出，AppImage 在缺少 FUSE 时可用 `--appimage-extract-and-run` 运行。
+
 产物位于相应 Cargo target 的 `release/bundle` 目录。两种语言、Agent Skill、启动器和许可说明随包提供。已发布安装包对应发布时的提交，不随后续源码变化更新。
 
 ## CI
 
 [Desktop CI](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) 在 push、PR 与手动运行时执行：
 
-| 阶段          | 范围                                                                                                                             |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Checks        | macOS ARM64、macOS Intel、Windows x64 原生 runner：格式、前端测试和构建、Rust Clippy、真实 Git 集成测试                          |
-| Package       | 所有源码检查通过后，构建 macOS 通用 DMG 与 Windows x64 NSIS                                                                      |
-| Installed CLI | 同一个通用 DMG 分别在两种 macOS 架构安装，Windows 安装 NSIS；运行已安装程序和启动器，验证资源、CLI、中文路径、LFS 和仓库字节不变 |
+| 阶段          | 范围                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Checks        | macOS ARM64、macOS Intel、Windows x64、Ubuntu x64 原生 runner：格式、前端测试和构建、Rust Clippy、真实 Git 集成测试                                    |
+| Package       | 所有源码检查通过后，构建 macOS 通用 DMG、Windows x64 NSIS，以及 Linux 的 deb、rpm 与 AppImage                                                          |
+| Installed CLI | 同一个通用 DMG 分别在两种 macOS 架构安装，Windows 安装 NSIS，Linux 解包三种安装包；运行已安装程序和启动器，验证资源、CLI、中文路径、LFS 和仓库字节不变 |
 
 安装包与每个平台的 JSON 报告保留 14 天，不自动发布 Release。同一 ref 的新运行会取消未结束的旧运行。报告 CI 状态时关联相应提交的真实结果。
 
-macOS 可本地检查安装包：
+macOS 与 Linux 可本地检查安装包：
 
 ```sh
 node scripts/ci-install-smoke.mjs --artifact-dir "/安装包所在目录" --report reports/installed.json
 ```
 
-脚本将应用复制到独立临时目录，检查后删除。Windows NSIS 会写入安装记录和快捷方式，因此只允许在临时 GitHub Actions runner 执行。Git 写入只用于构造临时夹具，之后逐字节比较读取前后仓库。
+脚本将应用复制到独立临时目录，检查后删除。Linux 在该目录中解包 deb、rpm 与 AppImage 而不安装，因此不需要 root 权限，也不需要挂载 FUSE。Windows NSIS 会写入安装记录和快捷方式，因此只允许在临时 GitHub Actions runner 执行。Git 写入只用于构造临时夹具，之后逐字节比较读取前后仓库。
 
 ## 源码结构
 

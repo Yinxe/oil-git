@@ -38,9 +38,9 @@ The interface supports English and Simplified Chinese. It follows the system lan
 
 ## Install
 
-Download the macOS DMG or Windows x64 installer from [GitHub Releases](https://github.com/oil-oil/oil-git/releases). Feature scope follows the release tag and notes. For changes on the default branch, use the matching [CI build artifact](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) or [build from source](docs/development.md). Git must be installed on the computer. The packaged app does not require Python, Node.js, or Rust at runtime.
+Download the macOS DMG or Windows x64 installer from [GitHub Releases](https://github.com/oil-oil/oil-git/releases), and build the Linux deb, rpm, and AppImage packages with the [development instructions](docs/development.md#package). Feature scope follows the release tag and notes. For changes on the default branch, use the matching [CI build artifact](https://github.com/oil-oil/oil-git/actions/workflows/build.yml) or [build from source](docs/development.md). Git must be installed on the computer. The packaged app does not require Python, Node.js, or Rust at runtime.
 
-Open a project from the toolbar or press **⌘ O** on macOS or **Ctrl O** on Windows. Selecting a directory inside a repository opens its owning repository. Use **⌘ R** or **Ctrl R** to refresh.
+Open a project from the toolbar or press **⌘ O** on macOS or **Ctrl O** elsewhere. Selecting a directory inside a repository opens its owning repository. Use **⌘ R** or **Ctrl R** to refresh.
 
 ## Agent and CLI
 

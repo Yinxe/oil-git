@@ -38,9 +38,9 @@
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/oil-oil/oil-git/releases) 下载 macOS DMG 或 Windows x64 安装器。发布包的功能范围以对应标签和发布说明为准；默认分支的最新改动可使用对应提交的 [CI 构建产物](https://github.com/oil-oil/oil-git/actions/workflows/build.yml)，或[从源码构建](docs/zh-CN/development.md)。电脑需要已安装 Git；运行打包后的应用不需要 Python、Node.js 或 Rust。
+从 [GitHub Releases](https://github.com/oil-oil/oil-git/releases) 下载 macOS DMG 或 Windows x64 安装器，Linux 的 deb、rpm 与 AppImage 按[开发说明](docs/zh-CN/development.md#打包)构建。发布包的功能范围以对应标签和发布说明为准；默认分支的最新改动可使用对应提交的 [CI 构建产物](https://github.com/oil-oil/oil-git/actions/workflows/build.yml)，或[从源码构建](docs/zh-CN/development.md)。电脑需要已安装 Git；运行打包后的应用不需要 Python、Node.js 或 Rust。
 
-从工具栏打开项目，或按 macOS **⌘ O**、Windows **Ctrl O**。选择仓库内的子目录也会打开所属仓库。按 **⌘ R** 或 **Ctrl R** 刷新。
+从工具栏打开项目，或按 macOS **⌘ O**、其他平台 **Ctrl O**。选择仓库内的子目录也会打开所属仓库。按 **⌘ R** 或 **Ctrl R** 刷新。
 
 ## Agent 与 CLI
 

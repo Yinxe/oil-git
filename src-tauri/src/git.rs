@@ -544,18 +544,18 @@ impl Git {
             .to_owned())
     }
     pub fn discover() -> Result<(Self, String)> {
-        let mut candidates = Vec::new();
+        // macOS applications start with a restricted PATH, so probe explicit locations before `git`.
         #[cfg(target_os = "macos")]
-        candidates.extend(
-            [
-                "/opt/homebrew/bin/git",
-                "/usr/local/bin/git",
-                "/Applications/Xcode.app/Contents/Developer/usr/bin/git",
-                "/Library/Developer/CommandLineTools/usr/bin/git",
-                "/usr/bin/git",
-            ]
-            .map(PathBuf::from),
-        );
+        let prefixes: &[&str] = &[
+            "/opt/homebrew/bin/git",
+            "/usr/local/bin/git",
+            "/Applications/Xcode.app/Contents/Developer/usr/bin/git",
+            "/Library/Developer/CommandLineTools/usr/bin/git",
+            "/usr/bin/git",
+        ];
+        #[cfg(not(target_os = "macos"))]
+        let prefixes: &[&str] = &[];
+        let mut candidates: Vec<PathBuf> = prefixes.iter().copied().map(PathBuf::from).collect();
         candidates.push(PathBuf::from("git"));
         #[cfg(windows)]
         for (variable, suffix) in [
